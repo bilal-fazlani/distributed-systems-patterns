@@ -1,0 +1,8 @@
+target
+.vscode
+.bloop
+.metals
+.DS_Store
+metals.sbt
+
+*.txt
