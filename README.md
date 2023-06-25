@@ -8,6 +8,6 @@ See [AppendOnlyLog.scala](src/main/scala/com/bilalfazlani/AppendOnlyLog.scala) f
 
 ## Write Ahead Log
 
-Write Ahead Log uses Append Only Log to store data. Additionally it stores the data in memory. It comes with the same advantages as Append Only Log but also additionally provides faster reads.
+Write Ahead Log uses Append Only Log to persist data. Additionally it stores the data in memory. It provides durability with faster reads.
 
 See [DurableKVStore.scala](src/main/scala/com/bilalfazlani/DurableKVStore.scala) for implementation.
