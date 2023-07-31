@@ -5,10 +5,11 @@ import zio.json.*
 import zio.nio.file.Path
 import java.io.IOException
 import com.bilalfazlani.*
+import zio.stream.ZStream
 
 trait AppendOnlyLog[A]:
   def append(a: A): ZIO[Scope, IOException, Unit]
-  def readAll: ZIO[Scope, IOException, Seq[A]]
+  def computeState[State](initial: State)(f: (State, A) => State): ZIO[Scope, Throwable, State]
 
 object AppendOnlyLog:
   def jsonFile[A: JsonCodec: Tag](
@@ -25,8 +26,10 @@ object AppendOnlyLog:
   ): ZIO[AppendOnlyLog[A] & Scope, IOException, Unit] =
     ZIO.serviceWithZIO[AppendOnlyLog[A]](_.append(a))
 
-  def readAll[A: JsonDecoder: Tag]: ZIO[AppendOnlyLog[A] & Scope, IOException, Seq[A]] =
-    ZIO.serviceWithZIO[AppendOnlyLog[A]](_.readAll)
+  def computeState[A: JsonDecoder: Tag, State](
+      initial: State
+  )(f: (State, A) => State): ZIO[AppendOnlyLog[A] & Scope, Throwable, State] =
+    ZIO.serviceWithZIO[AppendOnlyLog[A]](_.computeState(initial)(f))
 
 private case class State private (
     currentLines: Long,
@@ -94,21 +97,16 @@ private case class AppendOnlyLogJsonImpl[A: JsonCodec](
         else appendToFile(filePath, a.toJson)
     yield ()
 
-  def readAll: ZIO[Scope, IOException, Seq[A]] =
+  def computeState[State](initial: State)(f: (State, A) => State): ZIO[Scope, Throwable, State] =
     for
       _ <- sem.withPermitScoped
       filePaths <- findFiles(dir).runCollect.map(_.sortBy(_.filename.toString))
-      allLines <- ZIO.collectAll(filePaths.map(readFile)).map(_.flatten)
-    yield allLines
-
-  private def readFile(path: Path): IO[IOException, List[A]] =
-    readLines(path).map { allLines =>
-      val eithers: List[Either[String, A]] =
-        allLines.map(line => JsonDecoder[A].decodeJson(line)).toSeq
-      eithers
-        .foldLeft(Right(List.empty[A]): Either[String, List[A]]) { case (acc, either) =>
-          acc.flatMap(list => either.map(list :+ _))
-        }
-        .left
-        .map(e => new IOException(e))
-    }.absolve
+      aStream = filePaths
+        .map(p =>
+          streamLines(p)
+            .map(line => JsonDecoder[A].decodeJson(line).left.map(e => Throwable(e)))
+            .absolve
+        )
+        .foldLeft[ZStream[Any, Throwable, A]](ZStream.empty)(_ ++ _)
+      state <- aStream.runFold(initial)(f)
+    yield state

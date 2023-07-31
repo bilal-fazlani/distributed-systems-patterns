@@ -3,7 +3,6 @@ package com.bilalfazlani.logSegmentation
 import zio.*
 import zio.nio.file.*
 import zio.json.*
-import java.io.IOException
 
 trait KVReader[-K, +V]:
   def get(key: K): UIO[Option[V]]
@@ -12,8 +11,8 @@ trait KVWriter[-K, -V]:
   def set(key: K, value: V): Task[Unit]
   def delete(key: K): Task[Unit]
 
-/** A key value store that persists data to disk. It uses write ahead logging to
-  * persist data. Reading data is done from memory.
+/** A key value store that persists data to disk. It uses write ahead logging to persist data.
+  * Reading data is done from memory.
   */
 trait DurableKVStore[K, V] extends KVReader[K, V] with KVWriter[K, V]
 
@@ -38,16 +37,16 @@ object DurableKVStore:
   private def applyState[
       K: JsonCodec: Tag,
       V: JsonCodec: Tag
-  ]: ZLayer[AppendOnlyLog[KVCommand[K, V]], IOException, MemoryState[K, V]] =
+  ]: ZLayer[AppendOnlyLog[KVCommand[K, V]], Throwable, MemoryState[K, V]] =
     ZLayer
       .fromZIO(
         ZIO
-          .scoped(AppendOnlyLog.readAll[KVCommand[K, V]])
-          .map(lines =>
-            lines.foldLeft(Map.empty[K, V]) {
-              case (acc, KVCommand.Set[K, V](k, v)) => acc + ((k, v))
-              case (acc, KVCommand.Delete[K](k))    => acc - k
-            }
+          .scoped(
+            AppendOnlyLog.computeState[KVCommand[K, V], Map[K, V]](Map.empty)((state, command) =>
+              command match
+                case KVCommand.Set(k, v)   => state + ((k, v))
+                case KVCommand.Delete(key) => state - key
+            )
           )
           .map(MemoryState.live[K, V](_))
       )

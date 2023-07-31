@@ -41,6 +41,17 @@ def readLines(path: Path): ZIO[Any, IOException, List[String]] =
     case _: java.nio.file.NoSuchFileException => ZIO.succeed(List.empty)
   }
 
+/** Streams all the lines from the file. If the file doesn't exist, it will return an empty stream.
+  *
+  * @param path
+  */
+def streamLines(path: Path): ZStream[Any, IOException, String] =
+  Files
+    .lines(path, Charset.Standard.utf8)
+    .catchSome { case _: java.nio.file.NoSuchFileException =>
+      ZStream.empty
+    }
+
 /** Creates a file with the given contents or overwrites the file if it already exists. If the
   * parent directory doesn't exist, it will be created.
   * @param path
