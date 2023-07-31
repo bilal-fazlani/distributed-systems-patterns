@@ -1,16 +1,16 @@
-package com.bilalfazlani.durableKVStore
+package com.bilalfazlani.writeAheadLog
 
 import zio.test.*
 import zio.nio.file.Path
+import com.bilalfazlani.cleanFiles
 
 object DurableKVStoreTest extends ZIOSpecDefault {
-
   val spec = suite("DurableKVStore")(
-    test("set and get a value") {
-      val path = Path("set-get-value-test.txt")
+    test("set twice and get a value") {
+      val path = Path("target") / "test-output" / "write-ahead-log" / "set-twice-and-get.txt"
       val setName =
         (DurableKVStore
-          .set[String, String]("name", "A") *> DurableKVStore.set("name", "B"))
+          .set("name", "A") *> DurableKVStore.set("name", "B"))
           .provide(
             DurableKVStore.live[String, String](path),
             AppendOnlyLog.jsonFile[KVCommand[String, String]](path)
@@ -30,8 +30,8 @@ object DurableKVStoreTest extends ZIOSpecDefault {
         name <- getName
       } yield assertTrue(name.contains("B"))
     },
-    test("delete a value") {
-      val path = Path("delete-value-test.txt")
+    test("set and delete a value") {
+      val path = Path("target") / "test-output" / "write-ahead-log" / "set-and-delete.txt"
       val setName =
         (DurableKVStore
           .set("name", "A") *> DurableKVStore
@@ -53,5 +53,5 @@ object DurableKVStoreTest extends ZIOSpecDefault {
         name <- getName
       } yield assertTrue(name.isEmpty)
     }
-  )
+  ) @@ cleanFiles(Path("target") / "test-output" / "write-ahead-log")
 }

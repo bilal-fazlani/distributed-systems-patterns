@@ -1,4 +1,4 @@
-package com.bilalfazlani.durableKVStore
+package com.bilalfazlani.writeAheadLog
 
 import zio.*
 import zio.nio.file.*

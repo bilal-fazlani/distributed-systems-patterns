@@ -1,4 +1,4 @@
-package com.bilalfazlani.durableKVStore
+package com.bilalfazlani.logSegmentation
 
 import zio.*
 
