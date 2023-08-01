@@ -4,60 +4,16 @@ import zio.test.*
 import zio.nio.file.Path
 import zio.*
 import com.bilalfazlani.cleanFiles
+import com.bilalfazlani.compareFileNamesOfDirectories
+import com.bilalfazlani.compareFileContentsOfDirectories
 
 object DurableKVStoreTest extends ZIOSpecDefault {
-  val spec = suite("DurableKVStore")(
-    test("set twice and get a value") {
-      val path = Path("target") / "test-output" / "log-segmentation" / "set-twice-and-get"
-      val setName =
-        (DurableKVStore.set("name", "A") *> DurableKVStore.set("name", "B"))
-          .provide(
-            DurableKVStore.live[String, String](path),
-            AppendOnlyLog.jsonFile[KVCommand[String, String]](path, 10)
-          )
-
-      // providing layers multiple times ensures file is getting read multiple times
-
-      val getName = DurableKVStore
-        .get[String, String]("name")
-        .provide(
-          DurableKVStore.live[String, String](path),
-          AppendOnlyLog.jsonFile[KVCommand[String, String]](path, 10)
-        )
-
-      for {
-        _ <- setName
-        name <- getName
-      } yield assertTrue(name.contains("B"))
-    },
-    test("set and delete a value") {
-      val path = Path("target") / "test-output" / "log-segmentation" / "set-and-delete"
-      val setName =
-        (DurableKVStore
-          .set("name", "A") *> DurableKVStore
-          .delete("name"))
-          .provide(
-            DurableKVStore.live[String, String](path),
-            AppendOnlyLog.jsonFile[KVCommand[String, String]](path, 10)
-          )
-
-      val getName = DurableKVStore
-        .get[String, String]("name")
-        .provide(
-          DurableKVStore.live[String, String](path),
-          AppendOnlyLog.jsonFile[KVCommand[String, String]](path, 10)
-        )
-
-      for {
-        _ <- setName
-        name <- getName
-      } yield assertTrue(name.isEmpty)
-    },
+  val spec = suite("DurableKVStore with log segmentation")(
     test("after reaching maxline, should roll files") {
       val path = Path("target") / "test-output" / "log-segmentation" / "roll-test"
       val effect1 =
         (DurableKVStore.set("name", "A") *>
-          DurableKVStore.set("name", "B") *>
+          DurableKVStore.delete("name") *>
           DurableKVStore.set("name", "C") *>
           DurableKVStore.set("name", "D") *>
           DurableKVStore.set("name", "E") *>
@@ -67,13 +23,28 @@ object DurableKVStoreTest extends ZIOSpecDefault {
           DurableKVStore.set("name", "I") *>
           DurableKVStore.set("name", "J"))
 
-      effect1.provide(
+      val test = effect1.provide(
         DurableKVStore.live[String, String](path),
         AppendOnlyLog.jsonFile[KVCommand[String, String]](path, 3)
       ) *> effect1.provide(
         DurableKVStore.live[String, String](path),
         AppendOnlyLog.jsonFile[KVCommand[String, String]](path, 3)
-      ) *> assertCompletes
+      )
+      for
+        _ <- test
+        fileNamesMatch <- compareFileNamesOfDirectories(
+          path,
+          Path(
+            "src"
+          ) / "test" / "scala" / "com" / "bilalfazlani" / "2-log-segmentation" / "roll-test"
+        )
+        contentsMatch <- compareFileContentsOfDirectories(
+          path,
+          Path(
+            "src"
+          ) / "test" / "scala" / "com" / "bilalfazlani" / "2-log-segmentation" / "roll-test"
+        )
+      yield assertTrue(fileNamesMatch) && assertTrue(contentsMatch)
     }
   ) @@ cleanFiles(Path("target") / "test-output" / "log-segmentation")
 }

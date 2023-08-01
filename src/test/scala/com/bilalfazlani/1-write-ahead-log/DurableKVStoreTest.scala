@@ -3,9 +3,10 @@ package com.bilalfazlani.writeAheadLog
 import zio.test.*
 import zio.nio.file.Path
 import com.bilalfazlani.cleanFiles
+import com.bilalfazlani.compareFilesContents
 
 object DurableKVStoreTest extends ZIOSpecDefault {
-  val spec = suite("DurableKVStore")(
+  val spec = suite("DurableKVStore using write ahead log")(
     test("set twice and get a value") {
       val path = Path("target") / "test-output" / "write-ahead-log" / "set-twice-and-get.txt"
       val setName =
@@ -28,7 +29,11 @@ object DurableKVStoreTest extends ZIOSpecDefault {
       for {
         _ <- setName
         name <- getName
-      } yield assertTrue(name.contains("B"))
+        logFileContentsMatched <- compareFilesContents(
+          path,
+          Path("src") / "test" / "scala" / "com" / "bilalfazlani" / "1-write-ahead-log" / "set-twice-and-get.txt"
+        )
+      } yield assertTrue(name.contains("B")) && assertTrue(logFileContentsMatched)
     },
     test("set and delete a value") {
       val path = Path("target") / "test-output" / "write-ahead-log" / "set-and-delete.txt"
@@ -51,7 +56,13 @@ object DurableKVStoreTest extends ZIOSpecDefault {
       for {
         _ <- setName
         name <- getName
-      } yield assertTrue(name.isEmpty)
+        logFileContentsMatched <- compareFilesContents(
+          path,
+          Path(
+            "src"
+          ) / "test" / "scala" / "com" / "bilalfazlani" / "1-write-ahead-log" / "set-and-delete.txt"
+        )
+      } yield assertTrue(name.isEmpty) && assertTrue(logFileContentsMatched)
     }
   ) @@ cleanFiles(Path("target") / "test-output" / "write-ahead-log")
 }

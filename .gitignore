@@ -4,5 +4,3 @@ target
 .metals
 .DS_Store
 metals.sbt
-
-*.txt
