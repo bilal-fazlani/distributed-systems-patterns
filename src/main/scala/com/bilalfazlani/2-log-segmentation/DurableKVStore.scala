@@ -65,7 +65,7 @@ private case class DurableKVStoreImpl[K, V](
 
   def delete(key: K): Task[Unit] =
     ZIO.scoped {
-      fileLog.append(KVCommand.Delete(key).asInstanceOf) *> memoryState.delete(
+      fileLog.append(KVCommand.Delete(key)) *> memoryState.delete(
         key
       )
     }
