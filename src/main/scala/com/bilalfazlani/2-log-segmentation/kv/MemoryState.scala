@@ -1,4 +1,5 @@
 package com.bilalfazlani.logSegmentation
+package kv
 
 import zio.*
 

@@ -1,8 +1,10 @@
 package com.bilalfazlani.logSegmentation
+package kv
 
 import zio.*
 import zio.nio.file.*
 import zio.json.*
+import log.AppendOnlyLog
 
 trait KVReader[-K, +V]:
   def get(key: K): UIO[Option[V]]
@@ -51,21 +53,3 @@ object DurableKVStore:
           .map(MemoryState.live[K, V](_))
       )
       .flatten
-
-private case class DurableKVStoreImpl[K, V](
-    memoryState: MemoryState[K, V],
-    fileLog: AppendOnlyLog[KVCommand[K, V]]
-) extends DurableKVStore[K, V]:
-  def get(key: K): UIO[Option[V]] = memoryState.get(key)
-
-  def set(key: K, value: V): Task[Unit] =
-    ZIO.scoped {
-      fileLog.append(KVCommand.Set(key, value)) *> memoryState.set(key, value)
-    }
-
-  def delete(key: K): Task[Unit] =
-    ZIO.scoped {
-      fileLog.append(KVCommand.Delete(key)) *> memoryState.delete(
-        key
-      )
-    }

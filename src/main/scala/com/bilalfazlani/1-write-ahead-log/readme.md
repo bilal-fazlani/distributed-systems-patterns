@@ -9,9 +9,9 @@ Write-Ahead-Log based KV Store
 
 - [x] Set a key value pair
   - [x] Save to log file
-  - [x] Update inmemory state
+  - [x] Update in-memory state
 - [x] Get a value for a key
-  - [x] Read from inmemory state
+  - [x] Read from in-memory state
 - [x] Construct state from the log file
 
 Limitations:
