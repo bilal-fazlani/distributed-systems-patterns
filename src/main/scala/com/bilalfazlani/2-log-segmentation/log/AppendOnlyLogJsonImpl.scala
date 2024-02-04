@@ -6,15 +6,12 @@ import zio.json.*
 import zio.nio.file.Path
 import java.io.IOException
 import com.bilalfazlani.*
-import zio.stream.ZStream
 
 case class AppendOnlyLogJsonImpl[A: JsonCodec](
     sem: Semaphore,
     state: Ref[State],
     dir: Path,
-    segmentSize: Long,
-    // stateComputer: StateComputer[A, State],
-    // stateLoader: StateLoader[State]
+    segmentSize: Long
 ) extends AppendOnlyLog[A]:
 
   private def inc(state: Ref[State]): UIO[IncResult] = state.modify { s =>
@@ -33,17 +30,3 @@ case class AppendOnlyLogJsonImpl[A: JsonCodec](
         if incResult == IncResult.NewFile then newFile(filePath, a.toJson)
         else appendToFile(filePath, a.toJson)
     yield ()
-
-  def computeState[State](initial: State)(f: (State, A) => State): ZIO[Scope, Throwable, State] =
-    for
-      _ <- sem.withPermitScoped
-      filePaths <- findFiles(dir).runCollect.map(_.sortBy(_.filename.toString))
-      aStream = filePaths
-        .map(p =>
-          streamLines(p)
-            .map(line => JsonDecoder[A].decodeJson(line).left.map(e => Throwable(e)))
-            .absolve
-        )
-        .foldLeft[ZStream[Any, Throwable, A]](ZStream.empty)(_ ++ _)
-      state <- aStream.runFold(initial)(f)
-    yield state

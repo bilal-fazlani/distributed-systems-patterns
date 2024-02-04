@@ -1,7 +1,6 @@
 package com.bilalfazlani.logSegmentation
 package kv
 
-import log.AppendOnlyLog
 import zio.test.*
 import zio.nio.file.Path
 import zio.*
@@ -27,11 +26,9 @@ object DurableKVStoreTest extends ZIOSpecDefault {
           DurableKVStore.set("name", "J"))
 
       val test = effect1.provide(
-        DurableKVStore.live[String, String](path),
-        AppendOnlyLog.jsonFile[KVCommand[String, String]](path, 3)
+        DurableKVStore.live[String, String](path, 3)
       ) *> effect1.provide(
-        DurableKVStore.live[String, String](path),
-        AppendOnlyLog.jsonFile[KVCommand[String, String]](path, 3)
+        DurableKVStore.live[String, String](path, 3)
       )
       for
         _ <- test

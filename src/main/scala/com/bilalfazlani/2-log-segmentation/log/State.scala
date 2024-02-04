@@ -3,7 +3,6 @@ package log
 
 import zio.*
 import zio.nio.file.Path
-import java.io.IOException
 import com.bilalfazlani.*
 
 /** Implementation of AppendOnlyLog using json files
@@ -43,8 +42,8 @@ enum IncResult:
   case NewFile(totalLines: Long)
 
 object State:
-  def loadFromDisk(dir: Path): IO[IOException, State] =
-    for
+  def fromDisk(dir: Path) =
+    ZLayer(for
       fileOffsets <- findFiles(dir)
         .collect { path =>
           path.filename.toString match {
@@ -55,4 +54,5 @@ object State:
         .map(_.sorted)
       lastFileOffset = fileOffsets.lastOption.getOrElse(0L)
       lineCount <- getLineCount(dir / s"log-$lastFileOffset.txt")
-    yield State(lineCount, lastFileOffset + lineCount, lastFileOffset)
+      stateRef <- Ref.make(State(lineCount, lastFileOffset + lineCount, lastFileOffset))
+    yield stateRef)
