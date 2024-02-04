@@ -12,8 +12,8 @@ trait KVWriter[-K, -V]:
   def set(key: K, value: V): Task[Unit]
   def delete(key: K): Task[Unit]
 
-/** A key value store that persists data to disk. It uses write ahead logging to persist data.
-  * Reading data is done from memory.
+/** A key value store that persists data to disk. Uses write ahead logging to persist data. Reading
+  * data is done from memory.
   */
 trait DurableKVStore[K, V] extends KVReader[K, V] with KVWriter[K, V]
 
@@ -57,16 +57,14 @@ private case class DurableKVStoreImpl[K, V](
     memoryState: MemoryState[K, V],
     fileLog: AppendOnlyLog[KVCommand[K, V]]
 ) extends DurableKVStore[K, V]:
+
+  def set(key: K, value: V): Task[Unit] = ZIO.scoped {
+    fileLog.append(KVCommand.Set(key, value))
+      *> memoryState.set(key, value)
+  }
+
+  def delete(key: K): Task[Unit] = ZIO.scoped {
+    fileLog.append(KVCommand.Delete(key)) *> memoryState.delete(key)
+  }
+
   def get(key: K): UIO[Option[V]] = memoryState.get(key)
-
-  def set(key: K, value: V): Task[Unit] =
-    ZIO.scoped {
-      fileLog.append(KVCommand.Set(key, value)) *> memoryState.set(key, value)
-    }
-
-  def delete(key: K): Task[Unit] =
-    ZIO.scoped {
-      fileLog.append(KVCommand.Delete(key)) *> memoryState.delete(
-        key
-      )
-    }

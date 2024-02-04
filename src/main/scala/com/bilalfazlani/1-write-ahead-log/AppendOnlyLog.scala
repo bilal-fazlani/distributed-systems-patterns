@@ -14,9 +14,7 @@ object AppendOnlyLog:
   def jsonFile[A: JsonCodec: Tag](
       path: Path
   ): ZLayer[Any, IOException, AppendOnlyLog[A]] =
-    ZLayer.fromZIO(Semaphore.make(1)) >>> ZLayer.fromFunction(
-      AppendOnlyLogJsonImpl(path, _)
-    )
+    ZLayer.fromZIO(Semaphore.make(1)) >>> ZLayer.fromFunction(AppendOnlyLogJsonImpl(path, _))
 
   def append[A: JsonEncoder: Tag](
       a: A
