@@ -5,7 +5,7 @@ import zio.*
 import log.AppendOnlyLog
 
 private[kv] case class DurableKVStoreImpl[K, V](
-    memoryState: MemoryState[K, V],
+    memoryState: ConcurrentMap[K, V],
     fileLog: AppendOnlyLog[KVCommand[K, V]]
 ) extends DurableKVStore[K, V]:
   def get(key: K): UIO[Option[V]] = memoryState.get(key)

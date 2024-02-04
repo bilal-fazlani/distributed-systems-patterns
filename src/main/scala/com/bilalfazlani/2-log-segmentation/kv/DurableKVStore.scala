@@ -5,6 +5,7 @@ import zio.*
 import zio.nio.file.*
 import zio.json.*
 import log.AppendOnlyLog
+import com.bilalfazlani.logSegmentation.log.StateLoader
 
 trait KVReader[-K, +V]:
   def get(key: K): UIO[Option[V]]
@@ -19,11 +20,12 @@ trait KVWriter[-K, -V]:
 trait DurableKVStore[K, V] extends KVReader[K, V] with KVWriter[K, V]
 
 object DurableKVStore:
-  def live[K: JsonCodec: Tag, V: JsonCodec: Tag](
-      path: Path
-  ) =
+  def live[K: Tag: JsonCodec, V: Tag: JsonCodec](path: Path) =
     ZLayer.makeSome[AppendOnlyLog[KVCommand[K, V]], DurableKVStore[K, V]](
-      applyState[K, V],
+      ZLayer.fromZIO(Semaphore.make(1)),
+      StateLoader.live[KVCommand[K, V], Map[K, V]](path),
+      StateComputerImpl.live[K, V],
+      ConcurrentMap.live[K, V],
       ZLayer.fromFunction(DurableKVStoreImpl.apply[K, V])
     )
 
@@ -35,21 +37,3 @@ object DurableKVStore:
 
   def delete[K: JsonCodec: Tag](key: K) =
     ZIO.serviceWithZIO[KVWriter[K, Nothing]](_.delete(key))
-
-  private def applyState[
-      K: JsonCodec: Tag,
-      V: JsonCodec: Tag
-  ]: ZLayer[AppendOnlyLog[KVCommand[K, V]], Throwable, MemoryState[K, V]] =
-    ZLayer
-      .fromZIO(
-        ZIO
-          .scoped(
-            AppendOnlyLog.computeState[KVCommand[K, V], Map[K, V]](Map.empty)((state, command) =>
-              command match
-                case KVCommand.Set(k, v)   => state + ((k, v))
-                case KVCommand.Delete(key) => state - key
-            )
-          )
-          .map(MemoryState.live[K, V](_))
-      )
-      .flatten

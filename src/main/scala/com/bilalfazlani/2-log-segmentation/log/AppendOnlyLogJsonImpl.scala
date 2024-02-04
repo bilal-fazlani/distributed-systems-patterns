@@ -12,7 +12,9 @@ case class AppendOnlyLogJsonImpl[A: JsonCodec](
     sem: Semaphore,
     state: Ref[State],
     dir: Path,
-    segmentSize: Long
+    segmentSize: Long,
+    // stateComputer: StateComputer[A, State],
+    // stateLoader: StateLoader[State]
 ) extends AppendOnlyLog[A]:
 
   private def inc(state: Ref[State]): UIO[IncResult] = state.modify { s =>

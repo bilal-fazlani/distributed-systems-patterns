@@ -3,10 +3,8 @@
 Append-Only Log
 
 - [x] Write entry to log file
-- [x] Read all entries from log files (from given offset *new)
+- [x] Read all entries from log files
 - [x] Segment log file *new
-- [ ] Snapshot log files *new
-- [ ] Cleanup log files *new
 
 Write-Ahead-Log based KV Store
 

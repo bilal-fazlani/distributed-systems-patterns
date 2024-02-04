@@ -10,7 +10,7 @@ import com.bilalfazlani.*
 
 trait AppendOnlyLog[A]:
   def append(a: A): ZIO[Scope, IOException, Unit]
-  def computeState[State](initial: State)(f: (State, A) => State): ZIO[Scope, Throwable, State]
+  // def computeState[State](initial: State)(f: (State, A) => State): ZIO[Scope, Throwable, State]
 
 object AppendOnlyLog:
   def jsonFile[A: JsonCodec: Tag](
@@ -27,8 +27,7 @@ object AppendOnlyLog:
   ): ZIO[AppendOnlyLog[A] & Scope, IOException, Unit] =
     ZIO.serviceWithZIO[AppendOnlyLog[A]](_.append(a))
 
-  def computeState[A: JsonDecoder: Tag, State](
-      initial: State
-  )(f: (State, A) => State): ZIO[AppendOnlyLog[A] & Scope, Throwable, State] =
-    ZIO.serviceWithZIO[AppendOnlyLog[A]](_.computeState(initial)(f))
-
+  // def computeState[A: JsonDecoder: Tag, State](
+  //     initial: State
+  // )(f: (State, A) => State): ZIO[AppendOnlyLog[A] & Scope, Throwable, State] =
+  //   ZIO.serviceWithZIO[AppendOnlyLog[A]](_.computeState(initial)(f))
