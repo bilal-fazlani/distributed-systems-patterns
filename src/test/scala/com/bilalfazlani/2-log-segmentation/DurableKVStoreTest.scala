@@ -1,14 +1,17 @@
 package com.bilalfazlani.logSegmentation
+package kv
 
+import log.AppendOnlyLog
 import zio.test.*
 import zio.nio.file.Path
 import zio.*
-import com.bilalfazlani.cleanFiles
-import com.bilalfazlani.compareFileNamesOfDirectories
-import com.bilalfazlani.compareFileContentsOfDirectories
+import com.bilalfazlani.*
 
 object DurableKVStoreTest extends ZIOSpecDefault {
   val spec = suite("DurableKVStore with log segmentation")(
+    // this test creates a durable kv store based on a append only log.
+    // the append only log is set to configure the max 3 records in a file
+    // the test writes 10 records to the store and verifies that the files are rolled
     test("after reaching maxline, should roll files") {
       val path = Path("target") / "test-output" / "log-segmentation" / "roll-test"
       val effect1 =
