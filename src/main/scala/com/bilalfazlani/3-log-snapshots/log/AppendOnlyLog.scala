@@ -4,20 +4,15 @@ package log
 
 import zio.*
 import zio.json.*
-import zio.nio.file.Path
-import java.io.IOException
 import com.bilalfazlani.*
 
 trait AppendOnlyLog[LogEntry]:
   def append(entry: LogEntry): ZIO[Scope, Throwable, Unit]
 
 object AppendOnlyLog:
-  def jsonFile[LogEntry: JsonCodec: Tag](
-      dir: Path,
-      maxLines: Long
-  ): ZLayer[Semaphore, IOException, AppendOnlyLogJsonImpl[LogEntry]] =
-    Pointer.fromDisk(dir) >>>
-      ZLayer.fromFunction(AppendOnlyLogJsonImpl.apply(_, _, dir, maxLines))
+  def jsonFile[LogEntry: JsonCodec: Tag]
+      : ZLayer[Semaphore, Exception, AppendOnlyLogJsonImpl[LogEntry]] =
+    Pointer.fromDisk >>> ZLayer.fromFunction(AppendOnlyLogJsonImpl.apply[LogEntry])
 
   def append[LogEntry: JsonEncoder: Tag](
       entry: LogEntry

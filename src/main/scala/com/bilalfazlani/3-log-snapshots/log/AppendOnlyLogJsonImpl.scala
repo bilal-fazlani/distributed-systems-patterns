@@ -3,28 +3,21 @@ package log
 
 import zio.*
 import zio.json.*
-import zio.nio.file.Path
-import java.io.IOException
 import com.bilalfazlani.*
 
 case class AppendOnlyLogJsonImpl[LogEntry: JsonCodec](
     sem: Semaphore,
-    state: Ref[Pointer],
-    dir: Path,
-    segmentSize: Long
+    state: Ref[Pointer]
 ) extends AppendOnlyLog[LogEntry]:
 
-  private def inc(state: Ref[Pointer]): UIO[IncResult] = state.modify { s =>
-    s.inc(segmentSize)
-  }
-
-  def append(entry: LogEntry): ZIO[Scope, IOException, Unit] =
+  def append(entry: LogEntry): ZIO[Scope, Exception, Unit] =
     for
+      config <- ZIO.config(LogConfiguration.config)
       _ <- sem.withPermitScoped
-      incResult <- inc(state)
+      incResult <- state.inc(config.segmentSize)
       filePath = incResult match {
-        case IncResult.SameFile(localLines, segmentOffset) => dir / s"log-$segmentOffset.txt"
-        case IncResult.NewFile(totalLines)                 => dir / s"log-$totalLines.txt"
+        case IncResult.SameFile(localLines, segmentOffset) => config.dir / s"log-$segmentOffset.txt"
+        case IncResult.NewFile(totalLines)                 => config.dir / s"log-$totalLines.txt"
       }
       _ <-
         if incResult == IncResult.NewFile then newFile(filePath, entry.toJson)

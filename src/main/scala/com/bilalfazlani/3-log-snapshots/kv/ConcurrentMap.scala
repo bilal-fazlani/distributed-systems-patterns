@@ -7,6 +7,7 @@ import log.StateComputer
 
 trait ConcurrentMap[K, V]:
   def get(key: K): UIO[Option[V]]
+  def getAll: UIO[Map[K, V]]
   def set(key: K, value: V): UIO[Unit]
   def delete(key: K): UIO[Unit]
 
@@ -33,6 +34,9 @@ case class ConcurrentMapImpl[K, V](
     computer: StateComputer[KVCommand[K, V], Map[K, V]]
 ) extends ConcurrentMap[K, V]:
   def get(key: K): UIO[Option[V]] = map.get.map(_.get(key))
+
+  def getAll: UIO[Map[K, V]] = map.get
+
   def set(key: K, value: V): UIO[Unit] =
     map.update(m => computer.compute(m, KVCommand.Set(key, value)))
   def delete(key: K): UIO[Unit] =

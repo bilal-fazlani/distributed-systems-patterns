@@ -2,7 +2,6 @@ package com.bilalfazlani.logSnapshots
 package kv
 
 import zio.*
-import zio.nio.file.*
 import zio.json.*
 import log.AppendOnlyLog
 import log.StateLoader
@@ -20,14 +19,14 @@ trait KVWriter[-K, -V]:
 trait DurableKVStore[K, V] extends KVReader[K, V] with KVWriter[K, V]
 
 object DurableKVStore:
-  def live[K: Tag: JsonCodec, V: Tag: JsonCodec](path: Path, segmentSize: Long) =
+  def live[K: Tag: JsonCodec, V: Tag: JsonCodec] =
     ZLayer.make[DurableKVStore[K, V]](
-      ZLayer.fromZIO(Semaphore.make(1)),
-      StateLoader.live[KVCommand[K, V], Map[K, V]](path),
+      ZLayer(Semaphore.make(1)),
+      StateLoader.live[KVCommand[K, V], Map[K, V]],
       StateComputerImpl.live[K, V],
       ConcurrentMap.live[K, V],
       ZLayer.fromFunction(DurableKVStoreImpl.apply[K, V]),
-      AppendOnlyLog.jsonFile[KVCommand[K, V]](path, segmentSize)
+      AppendOnlyLog.jsonFile[KVCommand[K, V]]
     )
 
   def get[K: JsonCodec: Tag, V: JsonCodec: Tag](key: K) =

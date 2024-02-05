@@ -1,4 +1,4 @@
-package com.bilalfazlani.logSegmentation
+package com.bilalfazlani.logSnapshots
 package kv
 
 import zio.test.*
@@ -8,12 +8,22 @@ import com.bilalfazlani.*
 
 object DurableKVStoreTest extends ZIOSpecDefault {
 
-  val spec = suite("DurableKVStore with log segmentation")(
+  override val bootstrap: ZLayer[Any, Any, TestEnvironment] =
+    Runtime.setConfigProvider(
+      ConfigProvider.fromMap(
+        Map(
+          "dir" -> (Path("target") / "test-output" / "log-snapshots" / "snapshot-test").toString,
+          "segmentSize" -> "3",
+          "snapshotFrequency" -> "1ms"
+        )
+      )
+    ) >>> zio.test.testEnvironment
+
+  val spec = suite("DurableKVStore with log snapshots")(
     // this test creates a durable kv store based on a append only log.
     // the append only log is set to configure the max 3 records in a file
     // the test writes 10 records to the store and verifies that the files are rolled
-    test("after reaching maxline, should roll files") {
-      val path = Path("target") / "test-output" / "log-segmentation" / "roll-test"
+    test("after reaching snapshot frequency, should create a snapshot") {
       val effect1 =
         (DurableKVStore.set("name", "A") *>
           DurableKVStore.delete("name") *>
@@ -27,25 +37,25 @@ object DurableKVStoreTest extends ZIOSpecDefault {
           DurableKVStore.set("name", "J"))
 
       val test = effect1.provide(
-        DurableKVStore.live[String, String](path, 3)
+        DurableKVStore.live[String, String]
       ) *> effect1.provide(
-        DurableKVStore.live[String, String](path, 3)
+        DurableKVStore.live[String, String]
       )
       for
         _ <- test
         fileNamesMatch <- compareFileNamesOfDirectories(
-          path,
+          Path("target") / "test-output" / "log-snapshots" / "snapshot-test",
           Path(
             "src"
-          ) / "test" / "scala" / "com" / "bilalfazlani" / "2-log-segmentation" / "roll-test"
+          ) / "test" / "scala" / "com" / "bilalfazlani" / "3-log-snapshots" / "snapshot-test"
         )
         contentsMatch <- compareFileContentsOfDirectories(
-          path,
+          Path("target") / "test-output" / "log-snapshots" / "snapshot-test",
           Path(
             "src"
-          ) / "test" / "scala" / "com" / "bilalfazlani" / "2-log-segmentation" / "roll-test"
+          ) / "test" / "scala" / "com" / "bilalfazlani" / "3-log-snapshots" / "snapshot-test"
         )
       yield assertTrue(fileNamesMatch) && assertTrue(contentsMatch)
     }
-  ) @@ cleanFiles(Path("target") / "test-output" / "log-segmentation")
+  ) @@ cleanFiles(Path("target") / "test-output" / "log-snapshots")
 }

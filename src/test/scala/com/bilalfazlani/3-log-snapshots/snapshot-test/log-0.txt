@@ -1,0 +1,3 @@
+{"Set":{"key":"name","value":"A"}}
+{"Delete":{"key":"name"}}
+{"Set":{"key":"name","value":"C"}}

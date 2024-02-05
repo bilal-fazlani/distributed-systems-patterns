@@ -3,7 +3,6 @@ package log
 
 import zio.*
 import com.bilalfazlani.*
-import zio.nio.file.Path
 import zio.json.*
 import zio.stream.ZStream
 
@@ -11,22 +10,18 @@ trait StateLoader[State]:
   def load: ZIO[Scope, Throwable, State]
 
 object StateLoader:
-  def live[Item: JsonCodec: Tag, State: Tag](
-      path: Path
-  ): ZLayer[Semaphore & StateComputer[Item, State], Nothing, StateLoader[State]] =
-    ZLayer.makeSome[Semaphore & StateComputer[Item, State], StateLoaderImpl[Item, State]](
-      ZLayer.succeed(path),
+  def live[Item: JsonCodec: Tag, State: Tag]
+      : ZLayer[StateComputer[Item, State], Nothing, StateLoader[State]] =
+    ZLayer.makeSome[StateComputer[Item, State], StateLoaderImpl[Item, State]](
       ZLayer.fromFunction(StateLoaderImpl.apply[Item, State])
     )
 
 case class StateLoaderImpl[Item: JsonCodec, State](
-    stateComputer: StateComputer[Item, State],
-    dir: Path,
-    sem: Semaphore
+    stateComputer: StateComputer[Item, State]
 ) extends StateLoader[State]:
   def load: ZIO[Scope, Throwable, State] =
     for
-      _ <- sem.withPermitScoped
+      dir <- ZIO.config(LogConfiguration.config).map(_.dir)
       filePaths <- findFiles(dir).runCollect.map(_.sortBy(_.filename.toString))
       aStream = filePaths
         .map(p =>

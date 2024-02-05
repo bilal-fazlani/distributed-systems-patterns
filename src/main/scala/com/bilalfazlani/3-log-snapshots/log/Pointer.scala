@@ -40,9 +40,15 @@ enum IncResult:
   case NewFile(totalLines: Long)
 
 object Pointer:
-  def fromDisk(dir: Path) =
+  extension (state: Ref[Pointer])
+    def inc(segmentSize: Long): UIO[IncResult] = state.modify { s =>
+      s.inc(segmentSize)
+    }
+
+  def fromDisk =
     ZLayer(for
-      fileOffsets <- findFiles(dir)
+      config <- ZIO.config(LogConfiguration.config)
+      fileOffsets <- findFiles(config.dir)
         .collect { path =>
           path.filename.toString match {
             case s"log-$offset.txt" => offset.toLong
@@ -51,7 +57,7 @@ object Pointer:
         .runCollect
         .map(_.sorted)
       lastFileOffset = fileOffsets.lastOption.getOrElse(0L)
-      lineCount <- getLineCount(dir / s"log-$lastFileOffset.txt")
+      lineCount <- getLineCount(config.dir / s"log-$lastFileOffset.txt")
       stateRef <- Ref.make(
         Pointer(lineCount, lastFileOffset + lineCount, lastFileOffset)
       )
