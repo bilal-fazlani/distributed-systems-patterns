@@ -51,13 +51,30 @@ class LowWaterMarkServiceImpl[St: JsonCodec, Item](
             case s"snapshot-${Long(offset)}.json"   => Some(offset)
             case s"snapshot-${Long(`offset`)}.json" => None
           }).flatten)
+          // create new snapshot
           _ <- newFile(path, state.toJson)
+          // delete previous snapshots
           _ <- ZIO
             .foreachPar(existingSnapShots)(ofst =>
               Files.deleteIfExists(dir / s"snapshot-$ofst.json")
             )
             .unit
             .catchAll(e => ZIO.logError(s"Error deleting previous snapshots: $e"))
+          // get all segments
+          allSegments <- findFiles(dir).runCollect
+            .map(_.collect(_.filename.toString match {
+              case s"segment-${Long(ofst)}.json" if ofst < offset => ofst
+            }))
+            .map(_.toArray.sorted)
+          // get commiitted which should be deleted
+          commmited = LowWaterMarkServiceImpl.committedSegments(allSegments, offset)
+          // delete all segments that are committed
+          _ <- ZIO
+            .foreachPar(allSegments.filter(commmited.contains)) { ofst =>
+              Files.deleteIfExists(dir / s"segment-$ofst.json")
+            }
+            .unit
+            .catchAll(e => ZIO.logError(s"Error deleting previous segments: $e"))
         } yield ()
       }
     } yield ()
@@ -88,8 +105,47 @@ class LowWaterMarkServiceImpl[St: JsonCodec, Item](
 
 case class Snapshot[State](state: State, offset: Long)
 
-// object Testing extends zio.ZIOAppDefault:
-//   def run =
-//     val schedule = Schedule.fixed(1.second)
-//     val effect = zio.Console.printLine("*")
-//     (effect repeat schedule)
+object LowWaterMarkServiceImpl:
+  /** takes sorted list of segments and and offset to find segments that are already committed
+    * @param segments
+    * @param offset
+    * @return
+    *   active segments
+    */
+  private[log] def committedSegments(
+      segments: Array[Long],
+      snapshot: Long
+  ): List[Long] =
+    case object Infinity {
+      override def toString(): String = "Inf"
+    }
+
+    case class Range(start: Long, end: Long | Infinity.type) {
+      def contains = (snapshot: Long) =>
+        start <= snapshot && (end match {
+          case i: Infinity.type =>
+            true
+          case e: Long =>
+            snapshot <= e
+        })
+
+      override def toString = s"$start ... $end"
+    }
+    val commiittedSegments = scala.collection.mutable.ListBuffer[Long]()
+    var i = 0
+
+    while (i < segments.length) do {
+      val start = segments(i)
+      if snapshot < start then return commiittedSegments.toList
+
+      val isLast = i == (segments.length - 1)
+      val end = if isLast then Infinity else segments(i + 1) - 1
+
+      if !Range(start, end).contains(snapshot)
+      then commiittedSegments += segments(i)
+      else return commiittedSegments.toList
+
+      i += 1
+    }
+
+    commiittedSegments.toList
