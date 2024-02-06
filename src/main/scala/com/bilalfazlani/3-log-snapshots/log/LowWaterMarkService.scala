@@ -116,36 +116,41 @@ object LowWaterMarkServiceImpl:
       segments: Array[Long],
       snapshot: Long
   ): List[Long] =
-    case object Infinity {
-      override def toString(): String = "Inf"
-    }
 
-    case class Range(start: Long, end: Long | Infinity.type) {
-      def contains = (snapshot: Long) =>
-        start <= snapshot && (end match {
-          case i: Infinity.type =>
-            true
-          case e: Long =>
-            snapshot <= e
-        })
-
-      override def toString = s"$start ... $end"
-    }
     val commiittedSegments = scala.collection.mutable.ListBuffer[Long]()
     var i = 0
 
     while (i < segments.length) do {
-      val start = segments(i)
-      if snapshot < start then return commiittedSegments.toList
-
       val isLast = i == (segments.length - 1)
-      val end = if isLast then Infinity else segments(i + 1) - 1
+      val range = if isLast then Range(segments(i)) else Range(segments(i), segments(i + 1) - 1)
 
-      if !Range(start, end).contains(snapshot)
-      then commiittedSegments += segments(i)
-      else return commiittedSegments.toList
+      range.contains(snapshot) match
+        case RangeResult.After                       => commiittedSegments += segments(i)
+        case RangeResult.Inside | RangeResult.Before => return commiittedSegments.toList
 
       i += 1
     }
 
-    commiittedSegments.toList
+    return commiittedSegments.toList
+
+case object Infinity {
+  override def toString(): String = "Inf"
+}
+
+enum RangeResult:
+  case Inside, Before, After
+
+case class Range(start: Long, end: Long | Infinity.type) {
+  def contains(snapshot: Long): RangeResult =
+    if snapshot < start then RangeResult.Before
+    end match {
+      case i: Infinity.type =>
+        RangeResult.Inside
+      case e: Long =>
+        if snapshot <= e then RangeResult.Inside else RangeResult.After
+    }
+  override def toString = s"$start ... $end"
+}
+
+object Range:
+  def apply(start: Long): Range = new Range(start, Infinity)
