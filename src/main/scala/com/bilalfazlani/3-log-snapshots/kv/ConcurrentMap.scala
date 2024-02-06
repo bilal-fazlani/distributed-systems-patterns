@@ -12,11 +12,7 @@ trait ConcurrentMap[K, V]:
   def delete(key: K): UIO[Unit]
 
 object ConcurrentMap:
-  def live[K: Tag, V: Tag]: ZLayer[
-    StateLoader[Map[K, V]] & StateComputer[KVCommand[K, V], Map[K, V]],
-    Throwable,
-    ConcurrentMap[K, V]
-  ] =
+  def live[K: Tag, V: Tag] =
     ZLayer.fromZIO(
       ZIO.scoped(
         for {

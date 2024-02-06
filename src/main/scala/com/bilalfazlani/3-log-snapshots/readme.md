@@ -1,5 +1,9 @@
 # write-ahead-log implementation with segmentation and snapshots for cleanup
 
+Design: 
+- Anytime we need to append to log file, we go via semaphore
+- Anytime we need to access Pointer, we go via semaphore
+
 Append-Only Log
 
 - [x] Write entry to log file

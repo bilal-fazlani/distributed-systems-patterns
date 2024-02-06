@@ -4,6 +4,7 @@ package log
 import zio.*
 import zio.nio.file.Path
 import com.bilalfazlani.*
+import zio.json.JsonCodec
 
 case class Pointer private (
     /** index of the current item in the segment
@@ -45,13 +46,13 @@ object Pointer:
       s.inc(segmentSize)
     }
 
-  def fromDisk =
+  def fromDisk[St: JsonCodec: Tag] =
     ZLayer(for
       config <- ZIO.config(LogConfiguration.config)
       fileOffsets <- findFiles(config.dir)
         .collect { path =>
           path.filename.toString match {
-            case s"log-$offset.txt" => offset.toLong
+            case s"log-${Long(offset)}.txt" => offset
           }
         }
         .runCollect
