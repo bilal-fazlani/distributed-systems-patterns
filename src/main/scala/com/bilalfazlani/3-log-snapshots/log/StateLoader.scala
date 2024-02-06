@@ -35,7 +35,6 @@ object StateLoader:
 
 case class StateLoaderImpl[Item: JsonCodec, State: JsonCodec](
     stateComputer: StateComputer[Item, State],
-    pointerRef: Ref[Pointer],
     lowWaterMarkService: LowWaterMarkService
 ) extends StateLoader[State]:
 

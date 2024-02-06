@@ -11,7 +11,7 @@ trait AppendOnlyLog[LogEntry]:
 
 object AppendOnlyLog:
   def jsonFile[LogEntry: JsonCodec: Tag]
-      : ZLayer[Semaphore, Exception, AppendOnlyLogJsonImpl[LogEntry]] =
+      : ZLayer[Semaphore & Hub[Event], Exception, AppendOnlyLogJsonImpl[LogEntry]] =
     Pointer.fromDisk >>> ZLayer.fromFunction(AppendOnlyLogJsonImpl.apply[LogEntry])
 
   def append[LogEntry: JsonEncoder: Tag](

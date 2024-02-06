@@ -15,31 +15,30 @@ object SnapshotService:
       config <- ZIO.config[LogConfiguration](LogConfiguration.config)
       sem <- ZIO.service[Semaphore]
       state <- ZIO.service[State[St]]
-      pointer <- ZIO.service[Ref[Pointer]]
+      pointer <- ZIO.service[Pointer]
       lowWaterMarkService <- ZIO.service[LowWaterMarkService]
       service = SnapshotServiceImpl[St](lowWaterMarkService, sem, state, pointer)
       schedule = Schedule.fixed(config.snapshotFrequency)
       started <- (service.createSnapshot repeat schedule).forkScoped.unit
-    } yield service)
+    } yield started)
 
 case class SnapshotServiceImpl[St: JsonCodec](
     lowWaterMarkService: LowWaterMarkService,
-    semaphore: Semaphore,
+    sem: Semaphore,
     state: State[St],
-    pointer: Ref[Pointer]
+    pointer: Pointer
 ) extends SnapshotService:
 
-  private def stateOffset = semaphore.withPermit(for {
+  private def stateOffset: ZIO[Any, Nothing, (St, Long)] = ZIO.scoped(sem.withPermit(for {
     state <- state.get
-    pointer <- pointer.get
-  } yield (state, pointer))
+    totalOffset <- pointer.totalIndex
+  } yield (state, totalOffset)))
 
   private[log] def createSnapshot: Task[Unit] =
     for {
       config <- ZIO.config(LogConfiguration.config)
       tuple <- stateOffset
-      (state, pointer) = tuple
-      offset = pointer.totalIndex
+      (state, offset) = tuple
       path = config.dir / s"snapshot-$offset.json"
       tempPath = config.dir / s"snapshot-$offset.json.tmp"
 

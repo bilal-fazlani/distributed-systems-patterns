@@ -13,6 +13,7 @@ lazy val root = project
         Libs.zioStreams,
         Libs.zioNio,
         Libs.zioJson,
+        Libs.zioHTTP,
         Libs.zioTest % Test,
         Libs.zioTestSbt % Test
       )

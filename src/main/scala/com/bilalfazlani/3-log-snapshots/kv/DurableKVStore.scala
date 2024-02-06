@@ -3,10 +3,7 @@ package kv
 
 import zio.*
 import zio.json.*
-import log.AppendOnlyLog
-import log.StateLoader
-import com.bilalfazlani.logSnapshots.log.Pointer
-import com.bilalfazlani.logSnapshots.log.LowWaterMarkService
+import log.*
 
 trait KVReader[-K, +V]:
   def get(key: K): UIO[Option[V]]
@@ -30,7 +27,15 @@ object DurableKVStore:
       Pointer.fromDisk[Map[K, V]],
       AppendOnlyLog.jsonFile[KVCommand[K, V]],
       LowWaterMarkService.live,
-      ZLayer.fromFunction(DurableKVStoreImpl.apply[K, V])
+      ZLayer.fromFunction(DurableKVStoreImpl.apply[K, V]),
+
+      // event hub
+      ZLayer(Hub.sliding[Event](5)),
+
+      // cleanup
+      Scope.default,
+      StateImpl.live[K, V],
+      SnapshotService.start[Map[K, V]]
     )
 
   def get[K: JsonCodec: Tag, V: JsonCodec: Tag](key: K) =
