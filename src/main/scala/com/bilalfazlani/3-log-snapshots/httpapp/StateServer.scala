@@ -2,14 +2,12 @@ package com.bilalfazlani.logSnapshots
 package httpapp
 
 import zio.*
-// import zio.stream.*
 import zio.http.*
-// import log.*
 
 object StateServer extends ZIOAppDefault:
 
   // routes for a kv store
-  val httpApp = allRoutes.toHttpApp
+  val httpApp = sample.allRoutes.toHttpApp
 
   override val run =
     Server.serve(httpApp).provideSome[Scope](Server.defaultWith(_.port(8000)))
