@@ -18,7 +18,10 @@ trait KVWriter[-K, -V]:
 trait DurableKVStore[K, V] extends KVReader[K, V] with KVWriter[K, V]
 
 object DurableKVStore:
-  def live[K: Tag: JsonCodec: JsonFieldDecoder: JsonFieldEncoder, V: Tag: JsonCodec] =
+  def live[K: Tag: JsonCodec: JsonFieldDecoder: JsonFieldEncoder, V: Tag: JsonCodec] = 
+    ZLayer.fromFunction(DurableKVStoreImpl.apply[K, V])
+
+  def default[K: Tag: JsonCodec: JsonFieldDecoder: JsonFieldEncoder, V: Tag: JsonCodec] =
     ZLayer.make[DurableKVStore[K, V]](
       ZLayer(Semaphore.make(1)),
       StateLoader.live[KVCommand[K, V], Map[K, V]],

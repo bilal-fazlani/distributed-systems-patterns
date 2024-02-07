@@ -10,5 +10,5 @@ object Libs {
   lazy val zioTest = ZIO %% "zio-test" % zioVersion
   lazy val zioTestSbt = ZIO %% "zio-test-sbt" % zioVersion
   lazy val zioJson = ZIO %% "zio-json" % "0.6.2"
-  lazy val zioHTTP = ZIO %% "zio-http" % "3.0.0-RC4"
+  lazy val zioHTTP = ZIO %% "zio-http" % "3.0.0-RC4+60-aecd87cb-SNAPSHOT"
 }

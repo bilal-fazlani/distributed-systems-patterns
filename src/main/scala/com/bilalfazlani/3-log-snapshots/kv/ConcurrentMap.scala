@@ -12,6 +12,13 @@ trait ConcurrentMap[K, V] extends State[Map[K, V]]:
   def delete(key: K): UIO[Unit]
 
 object ConcurrentMap:
+  // def test[K: Tag, V: Tag](data: Map[K, V]): ZLayer[Any, Nothing, ConcurrentMap[K, V]] =
+  //   ZLayer.make[ConcurrentMapImpl[K, V]](
+  //     ZLayer(Ref.make(Map.empty[K, V])),
+  //     ZLayer.fromFunction(ConcurrentMapImpl.apply[K, V]),
+  //     StateComputerImpl.live[K, V]
+  //   )
+
   def live[K: Tag, V: Tag] =
     ZLayer.fromZIO(
       ZIO.scoped(

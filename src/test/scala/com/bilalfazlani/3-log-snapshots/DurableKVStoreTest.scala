@@ -37,9 +37,9 @@ object DurableKVStoreTest extends ZIOSpecDefault {
           DurableKVStore.set("name", "J"))
 
       val test = effect1.provide(
-        DurableKVStore.live[String, String]
+        DurableKVStore.default[String, String]
       ) *> effect1.provide(
-        DurableKVStore.live[String, String]
+        DurableKVStore.default[String, String]
       )
       for
         _ <- test

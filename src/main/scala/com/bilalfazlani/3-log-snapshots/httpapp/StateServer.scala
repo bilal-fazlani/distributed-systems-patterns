@@ -4,13 +4,47 @@ package httpapp
 import zio.*
 import zio.http.*
 
+import log.*
+import kv.*
+
 object StateServer extends ZIOAppDefault:
 
-  // routes for a kv store
-  val httpApp = sample.allRoutes.toHttpApp
+  override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] =
+    Runtime.setConfigProvider(
+      ConfigProvider.fromMap(
+        Map(
+          "dir" -> (Path("target") / "log").toString,
+          "segmentSize" -> "3",
+          "snapshotFrequency" -> "10s"
+        )
+      )
+    )
+
+  val program = for {
+    app <- ZIO.serviceWith[KVRoutes](_.routes.toHttpApp)
+    _ <- Server.serve(app)
+  } yield ()
 
   override val run =
-    Server.serve(httpApp).provideSome[Scope](Server.defaultWith(_.port(8000)))
+    program.provideSome[Scope](
+      Server.defaultWith(_.port(8000)),
+      KVRoutes.live,
+      ZLayer(Semaphore.make(1)),
+      StateLoader.live[KVCommand[String, String], Map[String, String]],
+      StateComputerImpl.live[String, String],
+      ConcurrentMap.live[String, String],
+      Pointer.fromDisk[Map[String, String]],
+      AppendOnlyLog.jsonFile[KVCommand[String, String]],
+      LowWaterMarkService.live,
+      DurableKVStore.live[String, String],
+
+      // event hub
+      ZLayer(Hub.sliding[Event](5)),
+
+      // cleanup
+      DataDiscardService.live,
+      SnapshotService.start[Map[String, String]]
+    )
 
   // val dd = for {
   //   h <- Hub.sliding[Event](10)

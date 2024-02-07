@@ -21,10 +21,10 @@ trait Pointer:
     */
   def segmentOffset: UIO[Long]
 
-case class PointerImpl(pointerRef: Ref[Point], notification: Hub[Event]) extends Pointer:
+case class PointerImpl(pointRef: Ref[Point], notification: Hub[Event]) extends Pointer:
   def inc: Task[IncResult] = for {
     segmentSize <- ZIO.config[LogConfiguration](LogConfiguration.config).map(_.segmentSize)
-    tuple <- pointerRef.modify { p =>
+    tuple <- pointRef.modify { p =>
       val (result, newPoint) = p.inc(segmentSize)
       ((result, newPoint), newPoint)
     }
@@ -32,9 +32,9 @@ case class PointerImpl(pointerRef: Ref[Point], notification: Hub[Event]) extends
     _ <- notification.publish(Event.PointerMoved(newPoint)).fork
   } yield result
 
-  def localIndex: UIO[Long] = pointerRef.get.map(_.localIndex)
-  def totalIndex: UIO[Long] = pointerRef.get.map(_.totalIndex)
-  def segmentOffset: UIO[Long] = pointerRef.get.map(_.segmentOffset)
+  def localIndex: UIO[Long] = pointRef.get.map(_.localIndex)
+  def totalIndex: UIO[Long] = pointRef.get.map(_.totalIndex)
+  def segmentOffset: UIO[Long] = pointRef.get.map(_.segmentOffset)
 
 case class Point(
     localIndex: Long,
