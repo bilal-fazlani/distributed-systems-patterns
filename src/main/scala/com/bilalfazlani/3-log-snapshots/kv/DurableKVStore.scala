@@ -34,7 +34,6 @@ object DurableKVStore:
 
       // cleanup
       Scope.default,
-      StateImpl.live[K, V],
       SnapshotService.start[Map[K, V]]
     )
 

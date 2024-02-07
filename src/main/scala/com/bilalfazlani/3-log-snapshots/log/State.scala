@@ -4,4 +4,4 @@ package log
 import zio.UIO
 
 trait State[A]:
-  def get: UIO[A]
+  def all: UIO[A]

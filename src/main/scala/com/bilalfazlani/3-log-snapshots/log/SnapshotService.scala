@@ -30,7 +30,7 @@ case class SnapshotServiceImpl[St: JsonCodec](
 ) extends SnapshotService:
 
   private def stateOffset: ZIO[Any, Nothing, (St, Long)] = ZIO.scoped(sem.withPermit(for {
-    state <- state.get
+    state <- state.all
     totalOffset <- pointer.totalIndex
   } yield (state, totalOffset)))
 
