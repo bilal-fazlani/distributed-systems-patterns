@@ -34,7 +34,8 @@ object DurableKVStore:
 
       // cleanup
       Scope.default,
-      SnapshotService.start[Map[K, V]]
+      SnapshotService.start[Map[K, V]],
+      DataDiscardService.live
     )
 
   def get[K: JsonCodec: Tag, V: JsonCodec: Tag](key: K) =

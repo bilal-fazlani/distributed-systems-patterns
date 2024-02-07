@@ -12,7 +12,7 @@ object StateServer extends ZIOAppDefault:
   val httpApp = allRoutes.toHttpApp
 
   override val run =
-    Server.serve(httpApp).provide(Server.defaultWith(_.port(8000)))
+    Server.serve(httpApp).provideSome[Scope](Server.defaultWith(_.port(8000)))
 
   // val dd = for {
   //   h <- Hub.sliding[Event](10)

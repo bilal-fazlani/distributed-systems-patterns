@@ -10,7 +10,6 @@ import zio.stream.ZStream
 case class KeyNotFound(key: String) derives Schema
 
 val mutableMap = collection.mutable.Map.empty[String, String]
-
 val put = Endpoint(Method.PUT / string("key") / string("value")).out[Unit]
 val getAll = Endpoint(RoutePattern(Method.GET, Path.root)).out[Map[String, String]]
 
@@ -37,7 +36,7 @@ val streamRoute = streamEndpoint.implement(
   )
 )
 
-val allRoutes = Routes(streamRoute, getRoute, putRoute, getAllRoute)
+val allRoutes = Routes(fileStreamRoute, streamRoute, getRoute, putRoute, getAllRoute)
 
 enum Event derives Schema:
   case Put(key: String, value: String)
