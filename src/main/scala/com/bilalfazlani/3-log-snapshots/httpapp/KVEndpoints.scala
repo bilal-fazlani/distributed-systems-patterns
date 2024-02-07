@@ -36,7 +36,7 @@ val streamRoute = streamEndpoint.implement(
   )
 )
 
-val allRoutes = Routes(fileStreamRoute, streamRoute, getRoute, putRoute, getAllRoute)
+val allRoutes = Routes(streamRoute, getRoute, putRoute, getAllRoute)
 
 enum Event derives Schema:
   case Put(key: String, value: String)
