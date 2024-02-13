@@ -14,12 +14,9 @@ case class AppendOnlyLogJsonImpl[LogEntry: JsonCodec](
     for
       config <- ZIO.config(LogConfiguration.config)
       _ <- sem.withPermitScoped
-      incResult <- pointer.inc
-      filePath = incResult match {
-        case IncResult.SameFile(localLines, segmentOffset) => config.dir / s"log-$segmentOffset.txt"
-        case IncResult.NewFile(totalLines)                 => config.dir / s"log-$totalLines.txt"
-      }
+      point <- pointer.inc
+      filePath = config.dir / s"log-${point.segment}.txt"
       _ <-
-        if incResult == IncResult.NewFile then newFile(filePath, entry.toJson)
+        if point.index == 0L then newFile(filePath, entry.toJson)
         else appendToFile(filePath, entry.toJson)
     yield ()

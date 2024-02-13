@@ -45,7 +45,7 @@ object DurableKVStoreTest extends ZIOSpecDefault {
             "src"
           ) / "test" / "scala" / "com" / "bilalfazlani" / "2-log-segmentation" / "roll-test"
         )
-      yield assertTrue(fileNamesMatch) && assertTrue(contentsMatch)
+      yield fileNamesMatch && contentsMatch
     }
   ) @@ cleanFiles(Path("target") / "test-output" / "log-segmentation")
 }

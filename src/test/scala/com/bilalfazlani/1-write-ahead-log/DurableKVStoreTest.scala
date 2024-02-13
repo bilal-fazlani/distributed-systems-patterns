@@ -33,7 +33,7 @@ object DurableKVStoreTest extends ZIOSpecDefault {
           path,
           Path("src") / "test" / "scala" / "com" / "bilalfazlani" / "1-write-ahead-log" / "set-twice-and-get.txt"
         )
-      } yield assertTrue(name.contains("B")) && assertTrue(logFileContentsMatched)
+      } yield assertTrue(name.contains("B")) && logFileContentsMatched
     },
     test("set and delete a value") {
       val path = Path("target") / "test-output" / "write-ahead-log" / "set-and-delete.txt"
@@ -62,7 +62,7 @@ object DurableKVStoreTest extends ZIOSpecDefault {
             "src"
           ) / "test" / "scala" / "com" / "bilalfazlani" / "1-write-ahead-log" / "set-and-delete.txt"
         )
-      } yield assertTrue(name.isEmpty) && assertTrue(logFileContentsMatched)
+      } yield assertTrue(name.isEmpty) && logFileContentsMatched
     }
   ) @@ cleanFiles(Path("target") / "test-output" / "write-ahead-log")
 }

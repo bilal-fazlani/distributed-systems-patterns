@@ -6,23 +6,40 @@ import zio.http.*
 
 import log.*
 import kv.*
+import zio.logging.ConsoleLoggerConfig
+import zio.logging.LogFormat
+import zio.logging.LogFilter.LogLevelByNameConfig
 
 object StateServer extends ZIOAppDefault:
 
   override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] =
-    Runtime.setConfigProvider(
-      ConfigProvider.fromMap(
-        Map(
-          "dir" -> (Path("target") / "log").toString,
-          "segmentSize" -> "3",
-          "snapshotFrequency" -> "10s"
+    Runtime.removeDefaultLoggers >>> zio.logging.consoleLogger(
+      ConsoleLoggerConfig(LogFormat.colored, LogLevelByNameConfig(LogLevel.Debug))
+    ) ++
+      Runtime.setConfigProvider(
+        ConfigProvider.fromMap(
+          Map(
+            "dir" -> (Path("target") / "log").toString,
+            "segmentSize" -> "3",
+            "snapshotFrequency" -> "10s"
+          )
         )
       )
-    )
+
+  val seedData = for {
+    kvStore <- ZIO.service[DurableKVStore[String, String]]
+    _ <- kvStore.set("a", "1").delay(1.second)
+    _ <- kvStore.set("b", "2").delay(1.second)
+    _ <- kvStore.set("c", "3").delay(1.second)
+    _ <- kvStore.set("a", "4").delay(1.second)
+    _ <- kvStore.set("b", "5").delay(1.second)
+    _ <- kvStore.set("c", "6").delay(1.second)
+  } yield ()
 
   val program = for {
     app <- ZIO.serviceWith[KVRoutes](_.routes.toHttpApp)
-    _ <- Server.serve(app)
+    _ <- Server.serve(app).forkScoped
+    _ <- seedData.forever
   } yield ()
 
   override val run =
@@ -35,7 +52,7 @@ object StateServer extends ZIOAppDefault:
       ConcurrentMap.live[String, String],
       Pointer.fromDisk[Map[String, String]],
       AppendOnlyLog.jsonFile[KVCommand[String, String]],
-      LowWaterMarkService.live,
+      LowWaterMarkService.fromDisk,
       DurableKVStore.live[String, String],
 
       // event hub
@@ -45,23 +62,3 @@ object StateServer extends ZIOAppDefault:
       DataDiscardService.live,
       SnapshotService.start[Map[String, String]]
     )
-
-  // val dd = for {
-  //   h <- Hub.sliding[Event](10)
-  //   _ <- h.publish(Event.PointerMoved(Point(0L, 0L, 0L)))
-  //   sseStream <- ZStream.fromHubScoped(h)
-  // } yield ()
-
-  // val stream: ZStream[Any, Nothing, ServerSentEvent] =
-  //   ZStream
-  //     .tick(1.second)
-  //     .map[Int](_ => 1)
-  //     .mapAccum[Int, Int](0)((acc, e) => (acc + e, acc + e))
-  //     .map(_.toString)
-  //     .map(ServerSentEvent(_))
-
-  // val app: HttpApp[Any] =
-  //   Routes(
-  //     Method.GET / "text" -> handler(Response.text("Hello World!")),
-  //     Method.GET / "sse" -> handler(Response.fromServerSentEvents(stream))
-  //   ).toHttpApp

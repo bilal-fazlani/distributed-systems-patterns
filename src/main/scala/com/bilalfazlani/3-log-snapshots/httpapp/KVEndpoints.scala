@@ -15,7 +15,10 @@ case class KeyNotFound(key: String) derives Schema
 case class KeyWriteError(message: String) derives Schema
 case class KeyDeleteError(message: String) derives Schema
 
-case class SSEData(point: Point, data: Map[String, String]) derives Schema
+sealed trait EventModel derives Schema
+case class DataChanged(point: Point, kvData: Map[String, String]) extends EventModel
+case class LowWaterMarkChanged(offset: Long) extends EventModel
+case class DataDiscarded(filesDeleted: List[String]) extends EventModel
 
 trait KVRoutes:
   val routes: Routes[Any, Response]
@@ -68,7 +71,11 @@ case class KVRoutesImpl(
     Handler.fromFunction(_ =>
       ZStream
         .fromHub(eventHub)
-        .mapZIO { case (e: Event.PointerMoved) => state.all.map(data => SSEData(e.point, data)) }
+        .mapZIO {
+          case (e: Event.PointerMoved)        => state.all.map(data => DataChanged(e.point, data))
+          case (e: Event.DateDiscarded)       => ZIO.succeed(DataDiscarded(e.filesDeleted))
+          case (e: Event.LowWaterMarkChanged) => ZIO.succeed(LowWaterMarkChanged(e.lwm))
+        }
         .map(e => ServerSentEvent(e.json, None, None, None))
     )
   )

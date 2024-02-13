@@ -14,7 +14,7 @@ object DurableKVStoreTest extends ZIOSpecDefault {
         Map(
           "dir" -> (Path("target") / "test-output" / "log-snapshots" / "snapshot-test").toString,
           "segmentSize" -> "3",
-          "snapshotFrequency" -> "1ms"
+          "snapshotFrequency" -> "15s"
         )
       )
     ) >>> zio.test.testEnvironment
@@ -37,9 +37,11 @@ object DurableKVStoreTest extends ZIOSpecDefault {
           DurableKVStore.set("name", "J"))
 
       val test = effect1.provide(
-        DurableKVStore.default[String, String]
+        DurableKVStore.withoutCleanup[String, String],
+        Scope.default
       ) *> effect1.provide(
-        DurableKVStore.default[String, String]
+        DurableKVStore.withoutCleanup[String, String],
+        Scope.default
       )
       for
         _ <- test
@@ -55,7 +57,7 @@ object DurableKVStoreTest extends ZIOSpecDefault {
             "src"
           ) / "test" / "scala" / "com" / "bilalfazlani" / "3-log-snapshots" / "snapshot-test"
         )
-      yield assertTrue(fileNamesMatch) && assertTrue(contentsMatch)
+      yield fileNamesMatch && contentsMatch
     }
   ) @@ cleanFiles(Path("target") / "test-output" / "log-snapshots")
 }

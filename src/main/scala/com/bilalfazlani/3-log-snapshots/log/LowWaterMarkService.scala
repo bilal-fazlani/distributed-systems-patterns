@@ -5,15 +5,15 @@ import zio.*
 import com.bilalfazlani.*
 
 trait LowWaterMarkService:
-  def lowWaterMark: UIO[Long]
-  def change[R, E](f: Long => ZIO[R, E, Long]): ZIO[R, E, Unit]
+  def lowWaterMark: UIO[Option[Long]]
+  def change[R, E](f: Option[Long] => ZIO[R, E, Option[Long]]): ZIO[R, E, Unit]
 
 object LowWaterMarkService:
-  val live = ZLayer(for {
-    config <- ZIO.config[LogConfiguration](LogConfiguration.config)
+  val fromDisk = ZLayer(for {
+    config <- ZIO.config(LogConfiguration.config)
     x <- findFiles(config.dir).runCollect.map(_.collect(_.filename.toString match {
       case s"snapshot-${Long(ofst)}.json" => ofst
-    }).sorted.lastOption.getOrElse(0L))
+    }).sorted.lastOption)
     ref <- Ref.Synchronized.make(x)
     service: LowWaterMarkService = LowWaterMarkServiceImpl(ref)
   } yield service)
@@ -21,9 +21,12 @@ object LowWaterMarkService:
 extension (l: Long.type) private[this] def unapply(s: String): Option[Long] = s.toLongOption
 
 case class LowWaterMarkServiceImpl(
-    ref: Ref.Synchronized[Long]
+    ref: Ref.Synchronized[Option[Long]]
 ) extends LowWaterMarkService:
 
-  def lowWaterMark: UIO[Long] = ref.get
+  def lowWaterMark: UIO[Option[Long]] = ref.get
 
-  def change[R, E](f: Long => ZIO[R, E, Long]) = ref.getAndUpdateZIO(f).unit
+  def change[R, E](f: Option[Long] => ZIO[R, E, Option[Long]]) =
+    // val g = f.compose[Option[Long]]()
+    for _ <- ref.getAndUpdateZIO(f)
+    yield ()

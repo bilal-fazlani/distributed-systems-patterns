@@ -18,25 +18,38 @@ trait KVWriter[-K, -V]:
 trait DurableKVStore[K, V] extends KVReader[K, V] with KVWriter[K, V]
 
 object DurableKVStore:
-  def live[K: Tag: JsonCodec: JsonFieldDecoder: JsonFieldEncoder, V: Tag: JsonCodec] = 
+  def live[K: Tag: JsonCodec: JsonFieldDecoder: JsonFieldEncoder, V: Tag: JsonCodec] =
     ZLayer.fromFunction(DurableKVStoreImpl.apply[K, V])
 
-  def default[K: Tag: JsonCodec: JsonFieldDecoder: JsonFieldEncoder, V: Tag: JsonCodec] =
-    ZLayer.make[DurableKVStore[K, V]](
+  def withoutCleanup[K: Tag: JsonCodec: JsonFieldDecoder: JsonFieldEncoder, V: Tag: JsonCodec] =
+    ZLayer.makeSome[Scope, DurableKVStore[K, V]](
       ZLayer(Semaphore.make(1)),
       StateLoader.live[KVCommand[K, V], Map[K, V]],
       StateComputerImpl.live[K, V],
       ConcurrentMap.live[K, V],
-      Pointer.fromDisk[Map[K, V]],
       AppendOnlyLog.jsonFile[KVCommand[K, V]],
-      LowWaterMarkService.live,
+      LowWaterMarkService.fromDisk,
+      ZLayer.fromFunction(DurableKVStoreImpl.apply[K, V]),
+
+      // event hub
+      ZLayer(Hub.sliding[Event](5))
+    )
+
+  def default[K: Tag: JsonCodec: JsonFieldDecoder: JsonFieldEncoder, V: Tag: JsonCodec] =
+    ZLayer.makeSome[Scope, DurableKVStore[K, V]](
+      ZLayer(Semaphore.make(1)),
+      StateLoader.live[KVCommand[K, V], Map[K, V]],
+      StateComputerImpl.live[K, V],
+      ConcurrentMap.live[K, V],
+      AppendOnlyLog.jsonFile[KVCommand[K, V]],
+      LowWaterMarkService.fromDisk,
       ZLayer.fromFunction(DurableKVStoreImpl.apply[K, V]),
 
       // event hub
       ZLayer(Hub.sliding[Event](5)),
 
       // cleanup
-      Scope.default,
+      Pointer.fromDisk[Map[K, V]],
       SnapshotService.start[Map[K, V]],
       DataDiscardService.live
     )
