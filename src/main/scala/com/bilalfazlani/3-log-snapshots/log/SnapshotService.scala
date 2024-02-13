@@ -24,7 +24,9 @@ object SnapshotService:
         state,
         pointer
       )
-      schedule = Schedule.fixed(config.snapshotFrequency)
+      schedule = config.snapshotFrequency match
+        case SnapshotFrequency.Off        => Schedule.stop
+        case SnapshotFrequency.Every(dur) => Schedule.fixed(dur)
       started <- (service.createSnapshot repeat schedule).forkScoped.unit
     } yield started)
 
@@ -42,35 +44,36 @@ case class SnapshotServiceImpl[St: JsonCodec](
   } yield (state, point))
 
   private[log] def createSnapshot: Task[Unit] =
-    // create new snapshot and update low water mark atomically
-    lowWaterMarkService.change { (oldLwm: Option[Long]) =>
-      for {
-        config <- ZIO.config(LogConfiguration.config)
-        tuple <- stateOffset
-        (state, point) = tuple
-        newLwm <- (oldLwm, point) match {
-          // there is no data to snapshot
-          case (_, Point.Empty) => ZIO.succeed(oldLwm)
-          // there was an old snapshot but no new data after it
-          case (Some(x: Long), p @ Point.NonEmpty(index, segment)) if p.totalIndex == x =>
-            ZIO.succeed(oldLwm)
-          // there is new data to snapshot
-          case (_, p @ Point.NonEmpty(index, segment)) =>
-            for
-              _ <- ZIO.logDebug(s"create snapshot triggered for offset ${p.totalIndex}")
-              path = config.dir / s"snapshot-${p.totalIndex}.json"
-              tempPath = config.dir / s"snapshot-${p.totalIndex}.json.tmp"
-              newLwm <- // create new snapshot
-              ZIO.scoped {
-                (newFile(tempPath, state.toJson) *> moveFile(tempPath, path)).withFinalizerExit {
-                  case (_, Exit.Failure(_)) =>
-                    Files
-                      .deleteIfExists(tempPath)
-                      .catchAll(_ => ZIO.logError("Error deleting temp file"))
-                  case (_, _) => ZIO.logInfo(s"snapshot created at $path")
-                } as p.totalIndex
-              } <* dataDiscardService.discard.fork // delete old snapshots and segments in background
-            yield Some(newLwm)
-        }
-      } yield newLwm
-    }
+    ZIO.logDebug(s"createSnapshot triggered...") *>
+      // create new snapshot and update low water mark atomically
+      lowWaterMarkService.change { (oldLwm: Option[Long]) =>
+        for {
+          config <- ZIO.config(LogConfiguration.config)
+          tuple <- stateOffset
+          (state, point) = tuple
+          newLwm <- (oldLwm, point) match {
+            // there is no data to snapshot
+            case (_, Point.Empty) => ZIO.succeed(oldLwm)
+            // there was an old snapshot but no new data after it
+            case (Some(x: Long), p @ Point.NonEmpty(index, segment)) if p.totalIndex == x =>
+              ZIO.succeed(oldLwm)
+            // there is new data to snapshot
+            case (_, p @ Point.NonEmpty(index, segment)) =>
+              for
+                _ <- ZIO.logDebug(s"create snapshot triggered for offset ${p.totalIndex}")
+                path = config.dir / s"snapshot-${p.totalIndex}.json"
+                tempPath = config.dir / s"snapshot-${p.totalIndex}.json.tmp"
+                newLwm <- // create new snapshot
+                ZIO.scoped {
+                  (newFile(tempPath, state.toJson) *> moveFile(tempPath, path)).withFinalizerExit {
+                    case (_, Exit.Failure(_)) =>
+                      Files
+                        .deleteIfExists(tempPath)
+                        .catchAll(_ => ZIO.logError("Error deleting temp file"))
+                    case (_, _) => ZIO.logInfo(s"snapshot created at $path")
+                  } as p.totalIndex
+                } <* dataDiscardService.discard.fork // delete old snapshots and segments in background
+              yield Some(newLwm)
+          }
+        } yield newLwm
+      }

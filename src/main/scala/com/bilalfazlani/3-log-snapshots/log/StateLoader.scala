@@ -45,7 +45,7 @@ case class StateLoaderImpl[Item: JsonCodec, State: JsonCodec](
 
   private def loadSnapshot(lwm: Option[Long], dir: Path): ZIO[Any, Throwable, State] =
     lwm.fold(ZIO.succeed(stateComputer.zero)) { lwm =>
-      if lwm == 0 then ZIO.succeed(stateComputer.zero)
+      if lwm == 0 then ZIO.succeed(stateComputer.zero) <* ZIO.debug("lwm was zero")
       else
         val file = (dir / s"snapshot-$lwm.json").toFile
         val inputStream = ZStream.fromFile(file)
@@ -88,10 +88,11 @@ case class StateLoaderImpl[Item: JsonCodec, State: JsonCodec](
   def load: ZIO[Any, Throwable, State] =
     for
       dir <- ZIO.config(LogConfiguration.config).map(_.dir)
-      lwm <- lowWaterMarkService.lowWaterMark
+      lwm <- lowWaterMarkService.lowWaterMark.debug("low water mark")
       avSegments <- availableSegments(dir)
       actSegments = StateLoader.activeSegments(avSegments, lwm)
-      stream = convertToStream(dir, actSegments, lwm)
-      zeroState <- loadSnapshot(lwm, dir)
-      finalState <- computeFinalState(zeroState, stream)
+      _ <- ZIO.debug(s"active segments: $actSegments")
+      stream = convertToStream(dir, actSegments, lwm).tap(x => ZIO.debug(s"record: $x"))
+      zeroState <- loadSnapshot(lwm, dir).debug("seed state")
+      finalState <- computeFinalState(zeroState, stream).debug("final state")
     yield finalState

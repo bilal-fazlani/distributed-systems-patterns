@@ -21,7 +21,7 @@ object StateServer extends ZIOAppDefault:
           Map(
             "dir" -> (Path("target") / "log").toString,
             "segmentSize" -> "3",
-            "snapshotFrequency" -> "10s"
+            "snapshotFrequency" -> "off"
           )
         )
       )
@@ -43,22 +43,23 @@ object StateServer extends ZIOAppDefault:
   } yield ()
 
   override val run =
-    program.provideSome[Scope](
-      Server.defaultWith(_.port(8000)),
-      KVRoutes.live,
-      ZLayer(Semaphore.make(1)),
-      StateLoader.live[KVCommand[String, String], Map[String, String]],
-      StateComputerImpl.live[String, String],
-      ConcurrentMap.live[String, String],
-      Pointer.fromDisk[Map[String, String]],
-      AppendOnlyLog.jsonFile[KVCommand[String, String]],
-      LowWaterMarkService.fromDisk,
-      DurableKVStore.live[String, String],
+    program
+      .provideSome[Scope](
+        Server.defaultWith(_.port(8000)),
+        KVRoutes.live,
+        ZLayer(Semaphore.make(1)),
+        StateLoader.live[KVCommand[String, String], Map[String, String]],
+        StateComputerImpl.live[String, String],
+        ConcurrentMap.live[String, String],
+        AppendOnlyLog.jsonFile[KVCommand[String, String]],
+        LowWaterMarkService.fromDisk,
+        DurableKVStore.live[String, String],
 
-      // event hub
-      ZLayer(Hub.sliding[Event](5)),
+        // event hub
+        ZLayer(Hub.sliding[Event](5))
 
-      // cleanup
-      DataDiscardService.live,
-      SnapshotService.start[Map[String, String]]
-    )
+        // cleanup
+        // Pointer.fromDisk[Map[String, String]],
+        // DataDiscardService.live,
+        // SnapshotService.start[Map[String, String]]
+      )

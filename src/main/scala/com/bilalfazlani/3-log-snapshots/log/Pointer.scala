@@ -62,7 +62,7 @@ object Pointer:
             }
           }
           .runCollect
-          .map(_.sorted.headOption)
+          .map(_.sorted.lastOption)
 
         p <- lastOffset match {
           case Some(offset) =>
