@@ -4,7 +4,7 @@ package httpapp
 import zio.http.*
 import zio.*
 import kv.DurableKVStore
-import log.{Event, Point, State}
+import log.*
 import zio.http.endpoint.Endpoint
 import zio.schema.*
 import zio.stream.ZStream
@@ -20,6 +20,8 @@ case class DataChanged(point: Point, kvData: Map[String, String]) extends EventM
 case class LowWaterMarkChanged(offset: Long) extends EventModel
 case class DataDiscarded(filesDeleted: List[String]) extends EventModel
 
+case class KvState(data: Map[String, String], lwm: Option[Long], point: Point) derives Schema
+
 trait KVRoutes:
   val routes: Routes[Any, Response]
 
@@ -29,27 +31,39 @@ object KVRoutes:
 case class KVRoutesImpl(
     kvStore: DurableKVStore[String, String],
     eventHub: Hub[Event],
+    lowWaterMarkService: LowWaterMarkService,
+    point: Pointer,
     state: State[Map[String, String]]
 ) extends KVRoutes:
   // -------- ENDPOINTS --------
+
+  // ....... Add new key-value pair .......
   val put = Endpoint(Method.PUT / "kv" / string("key") / string("value"))
     .out[Unit]
     .outError[KeyWriteError](Status.InternalServerError)
 
+  // ....... Delete a key-value pair .......
   val delete = Endpoint(Method.DELETE / "kv" / string("key"))
     .out[Unit]
     .outError[KeyDeleteError](Status.InternalServerError)
 
+  // ....... Get all key-value pairs .......
   val getAll = Endpoint(Method.GET / "kv")
     .out[Map[String, String]]
 
+  // ....... Get a key-value pair .......
   val getEndpoint =
     Endpoint(Method.GET / "kv" / string("key"))
       .out[String]
       .outError[KeyNotFound](Status.NotFound)
 
+  // ....... Stream events .......
   val streamEndpoint = Endpoint(Method.GET / "kv-stream")
     .outStream[ServerSentEvent]
+
+  // ....... Get state .......
+  val stateEndoint = Endpoint(Method.GET / "state")
+    .out[KvState]
 
   // -------- IMPLEMENTATIONS --------
   val getRoute = getEndpoint.implement(
@@ -80,6 +94,14 @@ case class KVRoutesImpl(
     )
   )
 
+  val stateRoute = stateEndoint.implement(Handler.fromFunctionZIO { _ =>
+    for {
+      data <- state.all
+      lwm <- lowWaterMarkService.lowWaterMark
+      point <- point.get
+    } yield KvState(data, lwm, point)
+  })
+
   // -------- OPENAPI --------
   val openApi = OpenAPIGen.fromEndpoints(
     "Durable Key-Value Store",
@@ -91,4 +113,4 @@ case class KVRoutesImpl(
 
   // -------- END --------
   override val routes =
-    Routes(streamRoute, getRoute, putRoute, deleteRoute, getAllRoute) ++ swaggerUI
+    Routes(streamRoute, getRoute, putRoute, deleteRoute, getAllRoute, stateRoute) ++ swaggerUI

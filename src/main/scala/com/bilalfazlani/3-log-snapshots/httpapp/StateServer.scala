@@ -18,8 +18,8 @@ object StateServer extends ZIOAppDefault:
         Map(
           "dir" -> (Path("target") / "log").toString,
           "segmentSize" -> "3",
-          "snapshotFrequency" -> "10s",
-          "logLevel" -> "info"
+          "snapshotFrequency" -> "off",
+          "logLevel" -> "debug"
         )
       )
     ) >>>
@@ -42,8 +42,8 @@ object StateServer extends ZIOAppDefault:
 
   val program = for {
     app <- ZIO.serviceWith[KVRoutes](_.routes.toHttpApp)
-    _ <- Server.serve(app).forkScoped
-    _ <- seedData.forever
+    _ <- Server.serve(app)
+    // _ <- seedData.forever
   } yield ()
 
   override val run =
