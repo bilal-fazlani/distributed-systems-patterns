@@ -6,67 +6,66 @@ import com.bilalfazlani.*
 import zio.nio.file.Files
 
 trait DataDiscardService:
-  def discard: Task[Unit]
+  def discard(lwm: Long): Task[Unit]
 
 object DataDiscardService:
-  def live: ZLayer[LowWaterMarkService & Hub[Event], Nothing, DataDiscardService] =
+  def live: ZLayer[Hub[Event], Nothing, DataDiscardService] =
     ZLayer.fromFunction(DataDiscardServiceImpl.apply)
 
 case class DataDiscardServiceImpl(
-    lowWaterMarkService: LowWaterMarkService,
     eventHub: Hub[Event]
 ) extends DataDiscardService:
-  def discard: Task[Unit] =
+  def discard(lwm: Long): Task[Unit] =
     for {
+      _ <- ZIO.logDebug(s"discard called for lwm $lwm")
       config <- ZIO.config(LogConfiguration.config)
-      offset: Option[Long] <- lowWaterMarkService.lowWaterMark
-      _ <- offset.fold(ZIO.unit) { offset =>
-        for
-          _ <- ZIO.logDebug(s"discard called for offset $offset")
-          // find any previous snapshots
-          previousSnapshots <- findFiles(config.dir).runCollect
-            .map(_.collect(_.filename.toString match {
-              case s"snapshot-${Long(ofs)}.json" if ofs != offset => Some(ofs)
-              case s"snapshot-${Long(`offset`)}.json"             => None
-            }).flatten)
-          _ <- ZIO.logDebug(s"previous snapshots to be discarded: $previousSnapshots")
-          // delete any previous snapshots
-          _ <- ZIO
-            .foreachPar(previousSnapshots)(ofst =>
-              Files.deleteIfExists(config.dir / s"snapshot-$ofst.json")
-            )
-            .unit
-            .catchAll(e => ZIO.logError(s"Error deleting previous snapshots: $e"))
-          _ <- ZIO.when(previousSnapshots.nonEmpty)(
-            ZIO.logInfo(s"discarded previous snapshots") *> eventHub.publish(
-              Event.DateDiscarded(
-                previousSnapshots.toList.map(x => (config.dir / s"snapshot-$x.json").toString)
-              )
-            )
+      // find any previous snapshots
+      previousSnapshots <- findFiles(config.dir).runCollect
+        .map(_.collect(_.filename.toString match {
+          case s"snapshot-${Long(ofs)}.json" if ofs != lwm => Some(ofs)
+          case s"snapshot-${Long(`lwm`)}.json"             => None
+        }).flatten)
+      _ <-
+        ZIO.when(previousSnapshots.nonEmpty)(
+          ZIO.logDebug(s"previous snapshots to be discarded: $previousSnapshots")
+        )
+      // delete any previous snapshots
+      _ <- ZIO
+        .foreachPar(previousSnapshots)(ofst =>
+          Files.deleteIfExists(config.dir / s"snapshot-$ofst.json")
+        )
+        .unit
+        .catchAll(e => ZIO.logError(s"Error deleting previous snapshots: $e"))
+      _ <- ZIO.when(previousSnapshots.nonEmpty)(
+        ZIO.logInfo(s"discarded previous snapshots: $previousSnapshots") *> eventHub.publish(
+          Event.DateDiscarded(
+            previousSnapshots.toList.map(x => (config.dir / s"snapshot-$x.json").toString)
           )
-          // get all segments
-          allSegments <- findFiles(config.dir).runCollect
-            .map(_.collect(_.filename.toString match {
-              case s"log-${Long(ofst)}.txt" => ofst
-            }))
-            .map(_.toArray.sorted)
-          segmentsToBeDiscarded = DataDiscardServiceImpl.segmentsToBeDiscarded(allSegments, offset)
-          _ <- ZIO.logDebug(s"segments to be discarded: $segmentsToBeDiscarded")
-          _ <- ZIO
-            .foreachPar(segmentsToBeDiscarded)(ofst =>
-              Files.deleteIfExists(config.dir / s"log-$ofst.txt")
-            )
-            .unit
-            .catchAll(e => ZIO.logError(s"Error deleting previous segments: $e"))
-          _ <- ZIO.when(segmentsToBeDiscarded.nonEmpty)(
-            ZIO.logInfo(s"discarded segments") *> eventHub.publish(
-              Event.DateDiscarded(
-                segmentsToBeDiscarded.map(x => (config.dir / s"log-$x.txt").toString)
-              )
-            )
+        )
+      )
+      // get all segments
+      allSegments <- findFiles(config.dir).runCollect
+        .map(_.collect(_.filename.toString match {
+          case s"log-${Long(ofst)}.txt" => ofst
+        }))
+        .map(_.toArray.sorted)
+      segmentsToBeDiscarded = DataDiscardServiceImpl.segmentsToBeDiscarded(allSegments, lwm)
+      _ <- ZIO.when(segmentsToBeDiscarded.nonEmpty)(
+        ZIO.logDebug(s"segments to be discarded: $segmentsToBeDiscarded")
+      )
+      _ <- ZIO
+        .foreachPar(segmentsToBeDiscarded)(ofst =>
+          Files.deleteIfExists(config.dir / s"log-$ofst.txt")
+        )
+        .unit
+        .catchAll(e => ZIO.logError(s"Error deleting previous segments: $e"))
+      _ <- ZIO.when(segmentsToBeDiscarded.nonEmpty)(
+        ZIO.logInfo(s"discarded segments: $segmentsToBeDiscarded") *> eventHub.publish(
+          Event.DateDiscarded(
+            segmentsToBeDiscarded.map(x => (config.dir / s"log-$x.txt").toString)
           )
-        yield ()
-      }
+        )
+      )
     } yield ()
 
 object DataDiscardServiceImpl:

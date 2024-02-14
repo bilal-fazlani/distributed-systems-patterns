@@ -13,18 +13,22 @@ import zio.logging.LogFilter.LogLevelByNameConfig
 object StateServer extends ZIOAppDefault:
 
   override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] =
-    Runtime.removeDefaultLoggers >>> zio.logging.consoleLogger(
-      ConsoleLoggerConfig(LogFormat.colored, LogLevelByNameConfig(LogLevel.Debug))
-    ) ++
-      Runtime.setConfigProvider(
-        ConfigProvider.fromMap(
-          Map(
-            "dir" -> (Path("target") / "log").toString,
-            "segmentSize" -> "3",
-            "snapshotFrequency" -> "off"
-          )
+    Runtime.setConfigProvider(
+      ConfigProvider.fromMap(
+        Map(
+          "dir" -> (Path("target") / "log").toString,
+          "segmentSize" -> "3",
+          "snapshotFrequency" -> "10s",
+          "logLevel" -> "info"
         )
       )
+    ) >>>
+      ZLayer(ZIO.config(LogConfiguration.config)) >>> ZLayer.service[LogConfiguration].flatMap {
+        config =>
+          Runtime.removeDefaultLoggers ++ zio.logging.consoleLogger(
+            ConsoleLoggerConfig(LogFormat.colored, LogLevelByNameConfig(config.get.logLevel))
+          )
+      }
 
   val seedData = for {
     kvStore <- ZIO.service[DurableKVStore[String, String]]
@@ -54,12 +58,12 @@ object StateServer extends ZIOAppDefault:
         AppendOnlyLog.jsonFile[KVCommand[String, String]],
         LowWaterMarkService.fromDisk,
         DurableKVStore.live[String, String],
+        Pointer.fromDisk[Map[String, String]],
 
         // event hub
-        ZLayer(Hub.sliding[Event](5))
+        ZLayer(Hub.sliding[Event](5)),
 
         // cleanup
-        // Pointer.fromDisk[Map[String, String]],
-        // DataDiscardService.live,
-        // SnapshotService.start[Map[String, String]]
+        DataDiscardService.live,
+        SnapshotService.start[Map[String, String]]
       )

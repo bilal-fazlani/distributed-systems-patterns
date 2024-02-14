@@ -30,6 +30,7 @@ object DurableKVStore:
       AppendOnlyLog.jsonFile[KVCommand[K, V]],
       LowWaterMarkService.fromDisk,
       ZLayer.fromFunction(DurableKVStoreImpl.apply[K, V]),
+      Pointer.fromDisk[Map[K, V]],
 
       // event hub
       ZLayer(Hub.sliding[Event](5))
@@ -44,12 +45,12 @@ object DurableKVStore:
       AppendOnlyLog.jsonFile[KVCommand[K, V]],
       LowWaterMarkService.fromDisk,
       ZLayer.fromFunction(DurableKVStoreImpl.apply[K, V]),
+      Pointer.fromDisk[Map[K, V]],
 
       // event hub
       ZLayer(Hub.sliding[Event](5)),
 
       // cleanup
-      Pointer.fromDisk[Map[K, V]],
       SnapshotService.start[Map[K, V]],
       DataDiscardService.live
     )
