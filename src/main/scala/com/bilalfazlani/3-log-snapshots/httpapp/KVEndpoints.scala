@@ -10,17 +10,25 @@ import zio.schema.*
 import zio.stream.ZStream
 import zio.http.endpoint.openapi.*
 import zio.http.codec.PathCodec
+import com.bilalfazlani.logSnapshots.log.Point.Empty
+import com.bilalfazlani.logSnapshots.log.Point.NonEmpty
 
 case class KeyNotFound(key: String) derives Schema
 case class KeyWriteError(message: String) derives Schema
 case class KeyDeleteError(message: String) derives Schema
+case class SnapshotError(message: String) derives Schema
 
 sealed trait EventModel derives Schema
 case class DataChanged(point: Point, kvData: Map[String, String]) extends EventModel
 case class LowWaterMarkChanged(offset: Long) extends EventModel
 case class DataDiscarded(filesDeleted: List[String]) extends EventModel
 
-case class KvState(data: Map[String, String], lwm: Option[Long], point: Point) derives Schema
+case class KvState(
+    data: Map[String, String],
+    lwm: Long,
+    lastWriteOffset: Long,
+    currentSegment: Long
+) derives Schema
 
 trait KVRoutes:
   val routes: Routes[Any, Response]
@@ -32,6 +40,7 @@ case class KVRoutesImpl(
     kvStore: DurableKVStore[String, String],
     eventHub: Hub[Event],
     lowWaterMarkService: LowWaterMarkService,
+    snapshotService: SnapshotService,
     point: Pointer,
     state: State[Map[String, String]]
 ) extends KVRoutes:
@@ -64,6 +73,11 @@ case class KVRoutesImpl(
   // ....... Get state .......
   val stateEndoint = Endpoint(Method.GET / "state")
     .out[KvState]
+
+  // ....... Take snapshot .......
+  val snapshotEndpoint = Endpoint(Method.POST / "snapshot")
+    .out[Unit]
+    .outError[SnapshotError](Status.InternalServerError)
 
   // -------- IMPLEMENTATIONS --------
   val getRoute = getEndpoint.implement(
@@ -99,7 +113,17 @@ case class KVRoutesImpl(
       data <- state.all
       lwm <- lowWaterMarkService.lowWaterMark
       point <- point.get
-    } yield KvState(data, lwm, point)
+      lastWriteOffset = point match
+        case Empty                    => -1L
+        case NonEmpty(index, segment) => segment.value + index
+      currentSegment = point match
+        case Empty                => -1L
+        case NonEmpty(_, segment) => segment.value
+    } yield KvState(data, lwm.getOrElse(-1L), lastWriteOffset, currentSegment)
+  })
+
+  val snapshotRoute = snapshotEndpoint.implement(Handler.fromFunctionZIO { _ =>
+    snapshotService.createSnapshot.mapError(e => SnapshotError(e.getMessage))
   })
 
   // -------- OPENAPI --------
@@ -113,4 +137,12 @@ case class KVRoutesImpl(
 
   // -------- END --------
   override val routes =
-    Routes(streamRoute, getRoute, putRoute, deleteRoute, getAllRoute, stateRoute) ++ swaggerUI
+    Routes(
+      streamRoute,
+      getRoute,
+      putRoute,
+      deleteRoute,
+      getAllRoute,
+      stateRoute,
+      snapshotRoute
+    ) ++ swaggerUI

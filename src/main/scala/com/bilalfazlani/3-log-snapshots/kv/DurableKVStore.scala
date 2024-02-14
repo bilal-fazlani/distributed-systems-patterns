@@ -36,25 +36,6 @@ object DurableKVStore:
       ZLayer(Hub.sliding[Event](5))
     )
 
-  def default[K: Tag: JsonCodec: JsonFieldDecoder: JsonFieldEncoder, V: Tag: JsonCodec] =
-    ZLayer.makeSome[Scope, DurableKVStore[K, V]](
-      ZLayer(Semaphore.make(1)),
-      StateLoader.live[KVCommand[K, V], Map[K, V]],
-      StateComputerImpl.live[K, V],
-      ConcurrentMap.live[K, V],
-      AppendOnlyLog.jsonFile[KVCommand[K, V]],
-      LowWaterMarkService.fromDisk,
-      ZLayer.fromFunction(DurableKVStoreImpl.apply[K, V]),
-      Pointer.fromDisk[Map[K, V]],
-
-      // event hub
-      ZLayer(Hub.sliding[Event](5)),
-
-      // cleanup
-      SnapshotService.start[Map[K, V]],
-      DataDiscardService.live
-    )
-
   def get[K: JsonCodec: Tag, V: JsonCodec: Tag](key: K) =
     ZIO.serviceWithZIO[KVReader[K, V]](_.get(key))
 

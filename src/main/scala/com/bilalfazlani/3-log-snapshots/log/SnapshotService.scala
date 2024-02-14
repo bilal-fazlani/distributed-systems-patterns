@@ -5,7 +5,8 @@ import zio.json.*
 import zio.*
 import com.bilalfazlani.*
 
-trait SnapshotService
+trait SnapshotService:
+  def createSnapshot: Task[Unit]
 
 object SnapshotService:
   def start[St: JsonCodec: Tag] =
@@ -28,7 +29,7 @@ object SnapshotService:
         case SnapshotFrequency.Every(dur) =>
           val schedule = Schedule.windowed(dur)
           (ZIO.sleep(dur) *> (service.createSnapshot repeat schedule)).forkScoped.unit
-    } yield started)
+    } yield service)
 
 case class SnapshotServiceImpl[St: JsonCodec](
     lowWaterMarkService: LowWaterMarkService,
@@ -43,7 +44,7 @@ case class SnapshotServiceImpl[St: JsonCodec](
     point <- pointer.get
   } yield (state, point))
 
-  private[log] def createSnapshot: Task[Unit] =
+  def createSnapshot: Task[Unit] =
     // create new snapshot and update low water mark atomically
     lowWaterMarkService.change { (oldLwm: Option[Long]) =>
       for {
