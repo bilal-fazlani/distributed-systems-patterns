@@ -17,7 +17,6 @@ case class DataDiscardServiceImpl(
 ) extends DataDiscardService:
   def discard(lwm: Long): Task[Unit] =
     for {
-      _ <- ZIO.logDebug(s"discard called for lwm $lwm")
       config <- ZIO.config(LogConfiguration.config)
       // find any previous snapshots
       previousSnapshots <- findFiles(config.dir).runCollect
@@ -77,20 +76,20 @@ object DataDiscardServiceImpl:
     */
   private[log] def segmentsToBeDiscarded(
       segments: Array[Long],
-      snapshot: Long
+      lwm: Long
   ): List[Long] =
     import SegmentRange.RangeResult
-    val commiittedSegments = scala.collection.mutable.ListBuffer[Long]()
+    val toBeDiscarded = scala.collection.mutable.ListBuffer[Long]()
     var i = 0
     while (i < segments.length) do {
       val isLast = i == (segments.length - 1)
       val range =
         if isLast then SegmentRange(segments(i)) else SegmentRange(segments(i), segments(i + 1) - 1)
 
-      range.contains(snapshot) match
-        case RangeResult.After                       => commiittedSegments += segments(i)
-        case RangeResult.Inside | RangeResult.Before => return commiittedSegments.toList
+      range.contains(lwm) match
+        case RangeResult.After | RangeResult.End     => toBeDiscarded += segments(i)
+        case RangeResult.Inside | RangeResult.Before => return toBeDiscarded.toList
 
       i += 1
     }
-    return commiittedSegments.toList
+    return toBeDiscarded.toList

@@ -12,7 +12,10 @@ trait Pointer:
   def inc: Task[Point.NonEmpty]
   def get: UIO[Point]
 
-case class PointerImpl(pointRef: Ref[Point], notification: Hub[Event]) extends Pointer:
+case class PointerImpl(
+    pointRef: Ref[Point],
+    notification: Hub[Event]
+) extends Pointer:
   def inc: Task[Point.NonEmpty] = for {
     segmentSize <- ZIO.config[LogConfiguration](LogConfiguration.config).map(_.segmentSize)
     result <- pointRef.updateAndGet(_.inc(segmentSize))
@@ -51,28 +54,12 @@ object Point:
       else NonEmpty(index + 1, segment)
 
 object Pointer:
-  def fromDisk[St: JsonCodec: Tag]: ZLayer[Hub[Event], Exception, Pointer] =
-    val f = (notification: Hub[Event]) =>
+  def fromDisk[St: JsonCodec: Tag]: ZLayer[Hub[Event] & ReadOnlyStorage, Exception, Pointer] =
+    val f = (notification: Hub[Event], readOnlyStorage: ReadOnlyStorage) =>
       ZLayer(for
         config <- ZIO.config(LogConfiguration.config)
-        lastOffset <- findFiles(config.dir)
-          .collect { path =>
-            path.filename.toString match {
-              case s"log-${Long(offset)}.txt" => offset
-            }
-          }
-          .runCollect
-          .map(_.sorted.lastOption)
-
-        p <- lastOffset match {
-          case Some(offset) =>
-            for
-              lineCount <- getLineCount(config.dir / s"log-$offset.txt")
-              point = Point.NonEmpty(lineCount - 1, Segment(offset))
-              stateRef: Ref[Point] <- Ref.make(point)
-            yield PointerImpl(stateRef, notification)
-          case None =>
-            Ref.make(Point.Empty).map((x: Ref[Point]) => PointerImpl(x, notification))
-        }
-      yield p)
+        point <- readOnlyStorage.lastWriteOffset
+        pointRef <- Ref.make(point)
+        service = PointerImpl(pointRef, notification)
+      yield service)
     ZLayer.fromFunction(f).flatten

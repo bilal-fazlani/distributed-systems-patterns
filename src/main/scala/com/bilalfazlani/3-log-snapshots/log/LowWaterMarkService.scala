@@ -10,11 +10,8 @@ trait LowWaterMarkService:
 
 object LowWaterMarkService:
   val fromDisk = ZLayer(for {
-    config <- ZIO.config(LogConfiguration.config)
-    x <- findFiles(config.dir).runCollect.map(_.collect(_.filename.toString match {
-      case s"snapshot-${Long(ofst)}.json" => ofst
-    }).sorted.lastOption)
-    ref <- Ref.Synchronized.make(x)
+    lastSnapshot <- ZIO.serviceWithZIO[ReadOnlyStorage](_.lastSnapshot)
+    ref <- Ref.Synchronized.make(lastSnapshot)
     eventHub <- ZIO.service[Hub[Event]]
     service: LowWaterMarkService = LowWaterMarkServiceImpl(ref, eventHub)
   } yield service)

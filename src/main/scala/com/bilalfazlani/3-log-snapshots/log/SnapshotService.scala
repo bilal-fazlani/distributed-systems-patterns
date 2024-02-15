@@ -60,7 +60,7 @@ case class SnapshotServiceImpl[St: JsonCodec](
           // there is new data to snapshot
           case (_, p @ Point.NonEmpty(index, segment)) =>
             for
-              _ <- ZIO.logDebug(s"create snapshot triggered for offset ${p.totalIndex}")
+              _ <- ZIO.logDebug(s"create snapshot triggered at offset ${p.totalIndex}")
               path = config.dir / s"snapshot-${p.totalIndex}.json"
               tempPath = config.dir / s"snapshot-${p.totalIndex}.json.tmp"
               _ <- newFile(tempPath, state.toJson) // create new temp snapshot
