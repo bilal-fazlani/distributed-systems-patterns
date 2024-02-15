@@ -48,7 +48,11 @@ case class DataDiscardServiceImpl(
           case s"log-${Long(ofst)}.txt" => ofst
         }))
         .map(_.toArray.sorted)
-      segmentsToBeDiscarded = DataDiscardServiceImpl.segmentsToBeDiscarded(allSegments, lwm)
+      segmentsToBeDiscarded = DataDiscardServiceImpl.segmentsToBeDiscarded(
+        allSegments,
+        lwm,
+        config.segmentSize
+      )
       _ <- ZIO.when(segmentsToBeDiscarded.nonEmpty)(
         ZIO.logDebug(s"segments to be discarded: $segmentsToBeDiscarded")
       )
@@ -76,7 +80,8 @@ object DataDiscardServiceImpl:
     */
   private[log] def segmentsToBeDiscarded(
       segments: Array[Long],
-      lwm: Long
+      lwm: Long,
+      segmentSize: Long
   ): List[Long] =
     import SegmentRange.RangeResult
     val toBeDiscarded = scala.collection.mutable.ListBuffer[Long]()
@@ -84,7 +89,8 @@ object DataDiscardServiceImpl:
     while (i < segments.length) do {
       val isLast = i == (segments.length - 1)
       val range =
-        if isLast then SegmentRange(segments(i)) else SegmentRange(segments(i), segments(i + 1) - 1)
+        if isLast then SegmentRange(segments(i), segments(i) + segmentSize - 1)
+        else SegmentRange(segments(i), segments(i + 1) - 1)
 
       range.contains(lwm) match
         case RangeResult.After | RangeResult.End     => toBeDiscarded += segments(i)

@@ -14,10 +14,11 @@ object DurableKVStoreTest extends ZIOSpecDefault {
         Map(
           "dir" -> (Path("target") / "test-output" / "log-snapshots" / "snapshot-test").toString,
           "segmentSize" -> "3",
-          "snapshotFrequency" -> "15s"
+          "snapshotFrequency" -> "off",
+          "logLevel" -> "off"
         )
       )
-    ) >>> zio.test.testEnvironment
+    ) ++ zio.test.testEnvironment
 
   val spec = suite("DurableKVStore with log snapshots")(
     // this test creates a durable kv store based on a append only log.

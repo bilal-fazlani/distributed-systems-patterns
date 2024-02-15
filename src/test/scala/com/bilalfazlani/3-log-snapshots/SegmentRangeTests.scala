@@ -25,10 +25,5 @@ object SegmentRangeTests extends ZIOSpecDefault:
       val range = SegmentRange(5, 10)
       val result = range.contains(11)
       assertTrue(result == RangeResult.After)
-    },
-    test("lwm at infinity") {
-      val range = SegmentRange(5, Infinity)
-      val result = range.contains(11)
-      assertTrue(result == RangeResult.Inside)
     }
   )

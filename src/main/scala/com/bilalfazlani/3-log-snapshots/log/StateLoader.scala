@@ -14,26 +14,23 @@ object StateLoader:
   def live[LogItem: JsonCodec: Tag, State: Tag: JsonCodec] =
     ZLayer.fromFunction(StateLoaderImpl.apply[LogItem, State])
 
-  private[log] def activeSegments(segments: List[Long], snapshot: Option[Long]): List[Long] =
+  private[log] def activeSegments(
+      segments: List[Long],
+      snapshot: Option[Long],
+      segmentSize: Long
+  ): List[Long] =
     snapshot.fold(segments) { snapshot =>
+      val ranges = SegmentRange.fromSegmentList(segments, segmentSize)
       import SegmentRange.RangeResult
-      val activeSegments = scala.collection.mutable.ListBuffer[Long]()
-      var i = 0
 
-      while (i < segments.length) do {
-        val isLast = i == (segments.length - 1)
-        val range =
-          if isLast then SegmentRange(segments(i))
-          else SegmentRange(segments(i), segments(i + 1) - 1)
-
-        range.contains(snapshot) match
-          case RangeResult.After | RangeResult.End     =>
-          case RangeResult.Inside | RangeResult.Before => activeSegments += segments(i)
-
-        i += 1
-      }
-
-      activeSegments.toList
+      ranges
+        .zip(segments)
+        .map { case (range @ SegmentRange(start, end), seg) =>
+          range.contains(snapshot) match
+            case RangeResult.Before | RangeResult.Inside => Some(seg)
+            case RangeResult.End | RangeResult.After     => None
+        }
+        .flatten
     }
 
 case class StateLoaderImpl[Item: JsonCodec, State: JsonCodec](
@@ -87,11 +84,11 @@ case class StateLoaderImpl[Item: JsonCodec, State: JsonCodec](
 
   def load: ZIO[Any, Throwable, State] =
     for
-      dir <- ZIO.config(LogConfiguration.config).map(_.dir)
+      config <- ZIO.config(LogConfiguration.config)
       lwm <- lowWaterMarkService.lowWaterMark
-      avSegments <- availableSegments(dir)
-      actSegments = StateLoader.activeSegments(avSegments, lwm)
-      stream = convertToStream(dir, actSegments, lwm)
-      zeroState <- loadSnapshot(lwm, dir)
+      avSegments <- availableSegments(config.dir)
+      actSegments = StateLoader.activeSegments(avSegments, lwm, config.segmentSize)
+      stream = convertToStream(config.dir, actSegments, lwm)
+      zeroState <- loadSnapshot(lwm, config.dir)
       finalState <- computeFinalState(zeroState, stream)
     yield finalState

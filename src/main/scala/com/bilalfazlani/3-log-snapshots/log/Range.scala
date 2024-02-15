@@ -1,13 +1,12 @@
 package com.bilalfazlani.logSnapshots
 package log
 
-import SegmentRange.{RangeResult, Infinity}
+import SegmentRange.{RangeResult}
 
-case class SegmentRange(start: Long, end: Long | Infinity.type) {
+case class SegmentRange(start: Long, end: Long) {
   def contains(lwm: Long): RangeResult =
     end match {
       case _: Long if lwm < start  => RangeResult.Before
-      case i: Infinity.type        => RangeResult.Inside
       case end: Long if lwm < end  => RangeResult.Inside
       case end: Long if lwm == end => RangeResult.End
       case end: Long               => RangeResult.After
@@ -17,10 +16,18 @@ case class SegmentRange(start: Long, end: Long | Infinity.type) {
 }
 
 object SegmentRange:
+  def fromSegmentList(segments: Seq[Long], segmentSize: Long): List[SegmentRange] =
+    val ranges = scala.collection.mutable.ListBuffer[SegmentRange]()
+    var i = 0
+    while (i < segments.length) do {
+      val isLast = i == (segments.length - 1)
+      ranges += {
+        if isLast then SegmentRange(segments(i), segments(i) + segmentSize - 1)
+        else SegmentRange(segments(i), segments(i + 1) - 1)
+      }
+      i += 1
+    }
+    return ranges.toList
+
   enum RangeResult:
     case Inside, End, Before, After
-
-  case object Infinity {
-    override def toString(): String = "Inf"
-  }
-  def apply(start: Long): SegmentRange = new SegmentRange(start, Infinity)

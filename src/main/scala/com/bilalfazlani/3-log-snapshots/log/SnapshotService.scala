@@ -17,7 +17,7 @@ object SnapshotService:
       pointer <- ZIO.service[Pointer]
       dataDiscardService <- ZIO.service[DataDiscardService]
       lowWaterMarkService <- ZIO.service[LowWaterMarkService]
-      service = SnapshotServiceImpl[St](
+      service: SnapshotService = SnapshotServiceImpl[St](
         lowWaterMarkService,
         dataDiscardService,
         sem,
@@ -65,6 +65,7 @@ case class SnapshotServiceImpl[St: JsonCodec](
               tempPath = config.dir / s"snapshot-${p.totalIndex}.json.tmp"
               _ <- newFile(tempPath, state.toJson) // create new temp snapshot
               _ <- moveFile(tempPath, path) // move temp snapshot to final location
+              _ <- ZIO.logInfo(s"snapshot created at offset ${p.totalIndex}")
               _ <- dataDiscardService.discard(p.totalIndex) // delete old snapshots and segments
             yield Some(p.totalIndex)
         }

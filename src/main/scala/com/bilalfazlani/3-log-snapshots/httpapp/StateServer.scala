@@ -10,7 +10,7 @@ import zio.logging.ConsoleLoggerConfig
 import zio.logging.LogFormat
 import zio.logging.LogFilter.LogLevelByNameConfig
 
-object StateServer extends ZIOAppDefault:
+object StateServer extends ZIOAppDefault: 
 
   override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] =
     Runtime.setConfigProvider(
@@ -19,7 +19,7 @@ object StateServer extends ZIOAppDefault:
           "dir" -> (Path("target") / "log").toString,
           "segmentSize" -> "3",
           "snapshotFrequency" -> "off",
-          "logLevel" -> "debug"
+          "logLevel" -> "info"
         )
       )
     ) >>>
@@ -60,7 +60,6 @@ object StateServer extends ZIOAppDefault:
         DurableKVStore.live[String, String],
         Pointer.fromDisk[Map[String, String]],
         ReadOnlyStorage.live,
-        
 
         // event hub
         ZLayer(Hub.sliding[Event](5)),
