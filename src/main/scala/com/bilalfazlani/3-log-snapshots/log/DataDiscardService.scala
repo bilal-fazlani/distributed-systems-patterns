@@ -26,7 +26,9 @@ case class DataDiscardServiceImpl(
         }).flatten)
       _ <-
         ZIO.when(previousSnapshots.nonEmpty)(
-          ZIO.logDebug(s"previous snapshots to be discarded: $previousSnapshots")
+          ZIO.logDebug(s"previous snapshots to be discarded: ${previousSnapshots.toList
+              .map(x => (s"snapshot-$x.json").toString)
+              .mkString(", ")}")
         )
       // delete any previous snapshots
       _ <- ZIO
@@ -58,7 +60,9 @@ case class DataDiscardServiceImpl(
         config.segmentSize
       )
       _ <- ZIO.when(segmentsToBeDiscarded.nonEmpty)(
-        ZIO.logDebug(s"segments to be discarded: $segmentsToBeDiscarded")
+        ZIO.logDebug(
+          s"segments to be discarded: ${segmentsToBeDiscarded.map(x => (s"log-$x.txt").toString).mkString(", ")}"
+        )
       )
       _ <- ZIO
         .foreachPar(segmentsToBeDiscarded)(ofst =>

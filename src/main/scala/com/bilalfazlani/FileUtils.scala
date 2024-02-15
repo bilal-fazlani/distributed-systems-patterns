@@ -64,7 +64,7 @@ def newFile(path: Path, contents: String) =
       _ <- Files.createDirectories(parent)
       _ <- overriteFile(path, contents)
     yield ()
-  )  
+  )
 
 /** Moves the file from the given path to the new path If the new path already exists, it will be
   * replaced If the parent directory of the new path doesn't exist, it will be created.
@@ -76,7 +76,7 @@ def moveFile(from: Path, to: Path) =
     from,
     to,
     StandardCopyOption.ATOMIC_MOVE,
-    StandardCopyOption.REPLACE_EXISTING,
+    StandardCopyOption.REPLACE_EXISTING
   )
 
 /** Appends the given contents to the file. If the file doesn't exist, it will be created. If the
