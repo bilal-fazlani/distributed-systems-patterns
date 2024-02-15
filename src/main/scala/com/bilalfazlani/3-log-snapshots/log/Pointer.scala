@@ -48,7 +48,7 @@ object Point:
 
     def inc(segmentSize: Long): NonEmpty =
       // new segment
-      if index == segmentSize - 1 then NonEmpty(0, Segment(totalIndex + 1))
+      if index >= segmentSize - 1 then NonEmpty(0, Segment(totalIndex + 1))
       // same segment
       else NonEmpty(index + 1, segment)
 

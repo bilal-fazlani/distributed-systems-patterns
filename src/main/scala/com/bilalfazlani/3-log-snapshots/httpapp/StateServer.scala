@@ -32,18 +32,18 @@ object StateServer extends ZIOAppDefault:
 
   val seedData = for {
     kvStore <- ZIO.service[DurableKVStore[String, String]]
-    _ <- kvStore.set("a", "1").delay(1.second)
-    _ <- kvStore.set("b", "2").delay(1.second)
-    _ <- kvStore.set("c", "3").delay(1.second)
-    _ <- kvStore.set("a", "4").delay(1.second)
-    _ <- kvStore.set("b", "5").delay(1.second)
-    _ <- kvStore.set("c", "6").delay(1.second)
+    _ <- kvStore.set("a", "1").delay(50.milli)
+    _ <- kvStore.set("b", "2").delay(50.milli)
+    _ <- kvStore.set("c", "3").delay(50.milli)
+    _ <- kvStore.set("a", "4").delay(50.milli)
+    _ <- kvStore.set("b", "5").delay(50.milli)
+    _ <- kvStore.set("c", "6").delay(50.milli)
   } yield ()
 
   val program = for {
     app <- ZIO.serviceWith[KVRoutes](_.routes.toHttpApp)
+    // _ <- seedData.forever.timeout(30.seconds).forkScoped
     _ <- Server.serve(app)
-    // _ <- seedData.forever
   } yield ()
 
   override val run =
