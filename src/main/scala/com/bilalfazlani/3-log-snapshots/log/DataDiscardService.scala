@@ -36,7 +36,11 @@ case class DataDiscardServiceImpl(
         .unit
         .catchAll(e => ZIO.logError(s"Error deleting previous snapshots: $e"))
       _ <- ZIO.when(previousSnapshots.nonEmpty)(
-        ZIO.logInfo(s"discarded previous snapshots: $previousSnapshots") *> eventHub.publish(
+        ZIO.logInfo(
+          s"discarded previous snapshots: ${previousSnapshots.toList
+              .map(x => (s"snapshot-$x.json").toString)
+              .mkString(", ")}"
+        ) *> eventHub.publish(
           Event.DateDiscarded(
             previousSnapshots.toList.map(x => (config.dir / s"snapshot-$x.json").toString)
           )
@@ -63,7 +67,9 @@ case class DataDiscardServiceImpl(
         .unit
         .catchAll(e => ZIO.logError(s"Error deleting previous segments: $e"))
       _ <- ZIO.when(segmentsToBeDiscarded.nonEmpty)(
-        ZIO.logInfo(s"discarded segments: $segmentsToBeDiscarded") *> eventHub.publish(
+        ZIO.logInfo(
+          s"discarded segments: ${segmentsToBeDiscarded.map(x => (s"log-$x.txt").toString).mkString(", ")}"
+        ) *> eventHub.publish(
           Event.DateDiscarded(
             segmentsToBeDiscarded.map(x => (config.dir / s"log-$x.txt").toString)
           )

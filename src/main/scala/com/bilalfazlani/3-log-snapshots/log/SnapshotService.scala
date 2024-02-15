@@ -24,7 +24,7 @@ object SnapshotService:
         state,
         pointer
       )
-      started <- config.snapshotFrequency.match
+      _ <- config.snapshotFrequency.match
         case SnapshotFrequency.Off => ZIO.unit
         case SnapshotFrequency.Every(dur) =>
           val schedule = Schedule.windowed(dur)

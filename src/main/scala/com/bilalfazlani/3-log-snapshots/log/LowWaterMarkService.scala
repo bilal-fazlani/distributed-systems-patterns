@@ -28,8 +28,8 @@ case class LowWaterMarkServiceImpl(
   def change[R, E](f: Option[Long] => ZIO[R, E, Option[Long]]) =
     val g = f.andThen(x =>
       x.flatMap {
-        case Some(point) => x <* eventHub.publish(Event.LowWaterMarkChanged(point))
-        case None        => x
+        case Some(point) => eventHub.publish(Event.LowWaterMarkChanged(point)).map(_ => Some(point))
+        case None        => ZIO.none
       }
     )
     ref.getAndUpdateZIO(g).unit
