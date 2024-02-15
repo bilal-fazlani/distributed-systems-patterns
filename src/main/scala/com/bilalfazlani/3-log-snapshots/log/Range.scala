@@ -10,8 +10,9 @@ case class SegmentRange(start: Long, end: Long | Infinity.type) {
       case i: Infinity.type        => RangeResult.Inside
       case end: Long if lwm < end  => RangeResult.Inside
       case end: Long if lwm == end => RangeResult.End
-      case end: Long if lwm > end  => RangeResult.After
+      case end: Long               => RangeResult.After
     }
+
   override def toString = s"$start ... $end"
 }
 

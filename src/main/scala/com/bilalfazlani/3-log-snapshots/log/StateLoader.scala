@@ -27,7 +27,7 @@ object StateLoader:
           else SegmentRange(segments(i), segments(i + 1) - 1)
 
         range.contains(snapshot) match
-          case RangeResult.After                       =>
+          case RangeResult.After | RangeResult.End     =>
           case RangeResult.Inside | RangeResult.Before => activeSegments += segments(i)
 
         i += 1

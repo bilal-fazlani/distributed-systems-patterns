@@ -4,7 +4,6 @@ package log
 import com.bilalfazlani.*
 import zio.*
 import zio.json.JsonCodec
-import zio.nio.file.Path
 import com.bilalfazlani.logSnapshots.log.Point.NonEmpty
 import zio.schema.*
 
@@ -54,12 +53,16 @@ object Point:
       else NonEmpty(index + 1, segment)
 
 object Pointer:
-  def fromDisk[St: JsonCodec: Tag]: ZLayer[Hub[Event] & ReadOnlyStorage, Exception, Pointer] =
-    val f = (notification: Hub[Event], readOnlyStorage: ReadOnlyStorage) =>
-      ZLayer(for
+  def fromDisk[St: JsonCodec: Tag]: ZLayer[ReadOnlyStorage & Hub[Event], Throwable, PointerImpl] =
+    def pointerImpl(readOnlyStorage: ReadOnlyStorage, eventHub: Hub[Event]) =
+      for
         config <- ZIO.config(LogConfiguration.config)
-        point <- readOnlyStorage.lastWriteOffset
+        point <- readOnlyStorage.lastWritePoint
         pointRef <- Ref.make(point)
-        service = PointerImpl(pointRef, notification)
-      yield service)
-    ZLayer.fromFunction(f).flatten
+      yield PointerImpl(pointRef, eventHub)
+
+    val nested =
+      (ZLayer.service[ReadOnlyStorage] ++ ZLayer.service[Hub[Event]]) >>>
+        ZLayer.fromFunction(pointerImpl)
+
+    nested.flatMap(x => ZLayer.fromZIO(x.get))

@@ -59,6 +59,8 @@ object StateServer extends ZIOAppDefault:
         LowWaterMarkService.fromDisk,
         DurableKVStore.live[String, String],
         Pointer.fromDisk[Map[String, String]],
+        ReadOnlyStorage.live,
+        
 
         // event hub
         ZLayer(Hub.sliding[Event](5)),

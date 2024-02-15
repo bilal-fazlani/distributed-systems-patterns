@@ -6,7 +6,7 @@ import com.bilalfazlani.*
 
 trait ReadOnlyStorage:
   def lastSnapshot: Task[Option[Long]]
-  def lastWriteOffset: Task[Point]
+  def lastWritePoint: Task[Point]
 
 object ReadOnlyStorageImpl extends ReadOnlyStorage:
   def lastSnapshot: Task[Option[Long]] =
@@ -47,3 +47,6 @@ object ReadOnlyStorageImpl extends ReadOnlyStorage:
           yield point
       }
     yield p
+
+object ReadOnlyStorage:
+  def live = ZLayer.succeed(ReadOnlyStorageImpl)

@@ -31,6 +31,7 @@ object DurableKVStore:
       LowWaterMarkService.fromDisk,
       ZLayer.fromFunction(DurableKVStoreImpl.apply[K, V]),
       Pointer.fromDisk[Map[K, V]],
+      ReadOnlyStorage.live,
 
       // event hub
       ZLayer(Hub.sliding[Event](5))
