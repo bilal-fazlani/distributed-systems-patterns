@@ -41,8 +41,14 @@ object StateServer extends ZIOAppDefault:
 
   val seedData =
     ZIO.serviceWithZIO[DurableKVStore[String, String]](kvStore =>
-      // randomKv.flatMap(kvStore.set).forever.timeout(10.seconds)
-      kvStore.set("A", "B").forever.timeout(1.seconds) *> Console.printLine("done seeding")
+      Console.printLine("seeding...") *>
+        (
+          kvStore.set("A", "1").forever zipPar
+            kvStore.set("B", "2").forever zipPar
+            kvStore.set("C", "3").forever zipPar
+            kvStore.set("D", "4").forever
+        )
+          .timeout(10.seconds) *> Console.printLine("done seeding")
     )
 
   val program = for {
